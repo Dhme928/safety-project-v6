@@ -184,17 +184,24 @@ function applySavedTheme() {
 
 function toggleDarkMode() {
   const body = document.body;
-  const icon = document.getElementById("modeIcon");
-  const isDark = body.classList.toggle("dark-mode");
-  localStorage.setItem("theme", isDark ? "dark" : "light");
-  if (icon) {
-    if (isDark) {
-      icon.classList.remove("fa-moon");
-      icon.classList.add("fa-sun");
-    } else {
-      icon.classList.remove("fa-sun");
-      icon.classList.add("fa-moon");
-    }
+  const icon = document.getElementById('modeIcon');
+
+  const isCurrentlyLight = body.classList.contains('light-mode');
+
+  if (isCurrentlyLight) {
+    // Switch to DARK
+    body.classList.remove('light-mode');
+    body.classList.add('dark-mode');
+
+    icon.classList.remove('fa-moon');
+    icon.classList.add('fa-sun');
+  } else {
+    // Switch to LIGHT
+    body.classList.remove('dark-mode');
+    body.classList.add('light-mode');
+
+    icon.classList.add('fa-moon');
+    icon.classList.remove('fa-sun');
   }
 }
 
