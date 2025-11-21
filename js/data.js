@@ -1,51 +1,39 @@
-// Central configuration & data (extracted from your original index.html)
+// Central configuration & data for the safety app
 // All URLs & safety libraries live here, so app.js can focus on logic/UI.
 
 // ========== GOOGLE FORMS ==========
-
-// Daily Tasks form (embedded in Tasks tab iframe)
-const TASKS_FORM_EMBED_URL =
+window.TASKS_FORM_EMBED_URL =
   'https://docs.google.com/forms/d/e/1FAIpQLSezm0wWTdEsvkIdnzhfpRf0G37tZzqbY-AF-BHfbXXiLr2rKA/viewform?embedded=true';
 
-// Observation submission form (floating "Add New Observation" button)
-// NOTE: In your old file this URL was visually truncated with "...", so if this
-// ever fails to open, just copy the full link from Google Forms and replace it.
-const ADD_OBSERVATION_FORM_URL =
+window.ADD_OBSERVATION_FORM_URL =
   'https://docs.google.com/forms/d/e/1FAIpQLSfYED_4UfHcmWn0fQOjtR5s8A0-Bhr4dwpe-80GjKkLeTR_Lw/viewform?usp=header';
 
-
 // ========== GOOGLE SHEETS (CSV) ==========
-//
-// NOTE: In your old file, some links were visually shortened with "..." which
-// breaks the real URL. Where I could recover the full ID, I rebuilt it.
-// Where I couldn’t, I left a clear placeholder for you to paste the full link
-// (just copy from Google Sheets and replace the whole string).
 
-// 1) Employee of the Month + Leaderboard sheet (CSV export URL)
-//    ⬇️ Please paste the FULL CSV export URL from Google Sheets here.
-const EOM_SHEET_URL = 'PASTE_YOUR_EOM_CSV_URL_HERE';
+// Employee of the Month + Leaderboard sheet (CSV)
+window.EOM_SHEET_URL =
+  'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0Km9p6XYDDxyGYSFfUjDjhdKMtr_hFvCiJ-U5_24_-QKrGsexZ4v3dxzKp0K1XZenNsiV7CiNmQEt/pub?output=csv';
 
-// 2) Observations main data sheet (CSV export URL for the Observations tab)
-//    ⬇️ Please paste the FULL CSV export URL from Google Sheets here.
-const OBSERVATIONS_SHEET_CSV_URL = 'PASTE_YOUR_OBSERVATIONS_CSV_URL_HERE';
+// Observations main data sheet (CSV)
+// (This is the same spreadsheet you used before in your Data tab,
+// converted from /pubhtml to /pub?output=csv)
+window.OBSERVATIONS_SHEET_CSV_URL =
+  'https://docs.google.com/spreadsheets/d/e/2PACX-1vTXlN-sE-IkQJLMaVOvRGSBYNLsDvwZTD15w7rarTIXBGoacF0C5_eiI7OmFs__zA8jtlwhy0ULLZ8N/pub?output=csv';
 
-// 3) News / Announcements sheet (CSV URL)
-//    This one had a visible sheet ID, so we can safely reconstruct it:
-const NEWS_SHEET_CSV_URL =
+// News / Announcements sheet (CSV)
+window.NEWS_SHEET_CSV_URL =
   'https://docs.google.com/spreadsheets/d/1_SwxL5f4mWF5kd2yofCMCEE_WQp_2eroHDhXXPXtw1U/export?format=csv&gid=0';
 
-// 4) Full observations sheet (for "Open full data sheet" button)
-//    You can use the normal Sheet URL (not CSV) for easier reading.
-const OBSERVATIONS_FULL_SHEET_URL =
-  'https://docs.google.com/spreadsheets/d/PASTE_YOUR_SHEET_ID_HERE/edit';
-
+// Full observations sheet (for "Open full data sheet" button)
+window.OBSERVATIONS_FULL_SHEET_URL =
+  'https://docs.google.com/spreadsheets/d/e/2PACX-1vTXlN-sE-IkQJLMaVOvRGSBYNLsDvwZTD15w7rarTIXBGoacF0C5_eiI7OmFs__zA8jtlwhy0ULLZ8N/pubhtml';
 
 // ========== TBT & JSA LIBRARIES ==========
 // Below are copied directly from your original index.html so you keep ALL
 // your toolbox talks and JSA links exactly as you had them.
 
 // TBT Data structure: { title: "TBT Title", link: "Google Drive Link" }
-const tbtData = [
+window.tbtData = [
     { title: " TBT of The Day Alcohol and Drugs", link: "https://drive.google.com/file/d/1uIGAjyY2UuxdkWToEGqMoF-L1Q9cIn5c/view?usp=drivesdk" },
     { title: " TBT of The Day Biohazard infection materials", link: "https://drive.google.com/file/d/1wUY8mlaEXOroUK5IoPPbBpym97Jdjfm4/view?usp=drivesdk" },
     { title: " TBT of The Day Cold Weather", link: "https://drive.google.com/file/d/1QOp3TVAb-si19p-taHpPjSwEfXs1O5us/view?usp=drivesdk" },
@@ -126,7 +114,7 @@ const tbtData = [
 ];
 
 // JSA Data structure: { title: "JSA Title", link: "Google Drive Link" }
-const jsaData = [
+window.jsaData = [
         { title: "Abrasive Blasting And Coating", link: "https://drive.google.com/file/d/1tZBj37GGJ7h9uRYDI5TIL04OkNrEMoLu/view?usp=drivesdk" },
         { title: "Backfilling Levelling And Compaction", link: "https://drive.google.com/file/d/1I32miHCfXBzETNx5UePxwHY4f9Fi-Fd1/view?usp=drivesdk" },
          { title: "Backfilling Levelling And Compaction Around Concrete Guards", link: "https://drive.google.com/file/d/1Fiei1faeqkuNCxR_-FMOlBF66w1ELC-0/view?usp=drivesdk" },
