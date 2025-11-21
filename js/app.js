@@ -1,34 +1,27 @@
 // =========================
-//  GLOBAL CONFIG from data.js
+//  GLOBAL CONFIG (filled from data.js at runtime)
 // =========================
-//
-// We expect these to exist globally (defined in js/data.js):
-// - TASKS_FORM_EMBED_URL
-// - ADD_OBSERVATION_FORM_URL
-// - EOM_SHEET_URL
-// - OBSERVATIONS_SHEET_CSV_URL
-// - NEWS_SHEET_CSV_URL
-// - OBSERVATIONS_FULL_SHEET_URL
-// - tbtData
-// - jsaData
 
-// Simple guards to avoid hard crashes if data.js is missing
-function safeGet(name, fallback) {
-  try {
-    if (typeof window[name] !== "undefined") return window[name];
-  } catch (e) {}
-  return fallback;
+let TASKS_URL = "";
+let ADD_OBS_URL = "";
+let EOM_CSV_URL = "";
+let OBS_CSV_URL = "";
+let NEWS_CSV_URL = "";
+let FULL_SHEET_URL = "";
+let TBT_LIST = [];
+let JSA_LIST = [];
+
+function initConfigFromWindow() {
+  // Read everything that data.js put on window.*
+  TASKS_URL = window.TASKS_FORM_EMBED_URL || "";
+  ADD_OBS_URL = window.ADD_OBSERVATION_FORM_URL || "";
+  EOM_CSV_URL = window.EOM_SHEET_URL || "";
+  OBS_CSV_URL = window.OBSERVATIONS_SHEET_CSV_URL || "";
+  NEWS_CSV_URL = window.NEWS_SHEET_CSV_URL || "";
+  FULL_SHEET_URL = window.OBSERVATIONS_FULL_SHEET_URL || "";
+  TBT_LIST = window.tbtData || [];
+  JSA_LIST = window.jsaData || [];
 }
-
-// Pull from window (where data.js put them)
-const TASKS_URL = safeGet("TASKS_FORM_EMBED_URL", "");
-const ADD_OBS_URL = safeGet("ADD_OBSERVATION_FORM_URL", "");
-const EOM_CSV_URL = safeGet("EOM_SHEET_URL", "");
-const OBS_CSV_URL = safeGet("OBSERVATIONS_SHEET_CSV_URL", "");
-const NEWS_CSV_URL = safeGet("NEWS_SHEET_CSV_URL", "");
-const FULL_SHEET_URL = safeGet("OBSERVATIONS_FULL_SHEET_URL", "");
-const TBT_LIST = safeGet("tbtData", []);
-const JSA_LIST = safeGet("jsaData", []);
 
 // =========================
 //  STATE
@@ -304,8 +297,7 @@ function setMonthColor() {
     "Pink",
     "Grey",
     "Black",
-    "White",
-    "Gold"
+    "White"
   ];
   el.textContent = colors[month] || "N/A";
 }
@@ -853,7 +845,7 @@ function switchTool(tool) {
   const windSec = document.getElementById("windSpeedSection");
 
   if (kpiSec) kpiSec.style.display = tool === "kpi" ? "block" : "none";
-  if (heatSec) heatSec.style.display = tool === "heat" ? "block" : "none";
+  if (heatSec) kpiSec && (heatSec.style.display = tool === "heat" ? "block" : "none");
   if (windSec) windSec.style.display = tool === "wind" ? "block" : "none";
 }
 
@@ -1307,10 +1299,13 @@ function getGPSLocation() {
 // =========================
 
 document.addEventListener("DOMContentLoaded", () => {
-  // Apply saved theme
+  // 1) Read all config from data.js
+  initConfigFromWindow();
+
+  // 2) Apply saved theme
   applySavedTheme();
 
-  // Initialize tabs (Home default)
+  // 3) Ensure Home tab marked active
   const defaultTabBtn = document.querySelector(
     '.nav-button[data-color][onclick*="HomeTab"]'
   );
@@ -1319,7 +1314,7 @@ document.addEventListener("DOMContentLoaded", () => {
     defaultTabBtn.setAttribute("aria-selected", "true");
   }
 
-  // Proper iframe & button URLs (override placeholders in HTML)
+  // 4) Proper iframe & button URLs (override placeholder in HTML)
   const tasksIframe = document.getElementById("tasksIframe");
   if (tasksIframe && TASKS_URL) {
     tasksIframe.src = TASKS_URL;
@@ -1329,36 +1324,36 @@ document.addEventListener("DOMContentLoaded", () => {
     addObsBtn.href = ADD_OBS_URL;
   }
 
-  // Month color
+  // 5) Month color
   setMonthColor();
 
-  // Accordions
+  // 6) Accordions
   initAccordions();
 
-  // EOM + leaderboard
+  // 7) EOM + leaderboard
   loadEomAndLeaderboard();
 
-  // TBT
+  // 8) TBT
   renderTbtOfTheDay();
   renderTbtLibrary();
 
-  // JSA
+  // 9) JSA
   renderJSAList();
   const jsaSearch = document.getElementById("jsaSearch");
   if (jsaSearch) {
     jsaSearch.addEventListener("input", filterJSAList);
   }
 
-  // KPIs
+  // 10) KPIs
   renderKPIs();
 
-  // Tools default
+  // 11) Tools default
   switchTool("kpi");
 
-  // Observations
+  // 12) Observations
   initObservationFiltersUI();
   loadObservations();
 
-  // News
+  // 13) News
   loadNews();
 });
