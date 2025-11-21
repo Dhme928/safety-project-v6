@@ -18,7 +18,7 @@ window.EOM_SHEET_URL =
 // (This is the same spreadsheet you used before in your Data tab,
 // converted from /pubhtml to /pub?output=csv)
 window.OBSERVATIONS_SHEET_CSV_URL =
-  'https://docs.google.com/spreadsheets/d/e/2PACX-1vTXlN-sE-IkQJLMaVOvRGSBYNLsDvwZTD15w7rarTIXBGoacF0C5_eiI7OmFs__zA8jtlwhy0ULLZ8N/pub?output=csv';
+  'https://docs.google.com/spreadsheets/d/e/2PACX-1vR4TGnZJsKUjK5zP8edMZ5fVz-nxsAxLdKsQiN0QF3O2WuLkiv8hGLYmrRxx1IZdxJjJEMxPMtp2Q63/pub?output=csv';
 
 // News / Announcements sheet (CSV)
 window.NEWS_SHEET_CSV_URL =
