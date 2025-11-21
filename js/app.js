@@ -866,27 +866,52 @@ function loadObservations() {
     .then(text => {
       const rows = parseCsv(text);
       const mapped = rows.map((r, idx) => {
-        const dateStr =
-          r.Date || r["Observation Date"] || r["Date of Observation"] || "";
-        const date = parseObsDate(dateStr);
-        const location = r.Location || r.Area || r.Site || "";
-        const type = r.Type || r["Observation Type"] || r.Category || "";
-        const risk = r.Risk || r["Risk Level"] || r["Risk"] || "";
-        const status = r.Status || r["Action Status"] || r["Obs Status"] || "";
-        const reporter =
-          r.Observer || r.Reporter || r["Reported By"] || "";
-        return {
-          id: idx + 1,
-          raw: r,
-          dateStr,
-          date,
-          location,
-          type,
-          risk,
-          status,
-          reporter
-        };
-      });
+  // Your sheet columns:
+  // Date, Day, Group #, Activity Type, Observation Class, Observation Types,
+  // Injury/No Injury, Type of Injury, Description, Name, ID, Position,
+  // Direct Cause, Root Cause, Equipment / Tool, Area, Likelihood, Severity,
+  // RA Rate, RA Level, Report Status, CSM, Comment
+
+  const dateStr = r.Date || "";                  // main date
+  const date = parseObsDate(dateStr);
+
+  // Use Area as "location" in the UI
+  const location = r.Area || r["Group #"] || "";
+
+  // Show observation type/class as "Type"
+  const type =
+    r["Observation Types"] ||
+    r["Observation Class"] ||
+    r["Activity Type"] ||
+    "";
+
+  // Use RA Level as risk (High / Medium / Low)
+  const risk =
+    r["RA Level"] ||
+    r["RA Rate"] ||
+    r.Severity ||
+    r.Likelihood ||
+    "";
+
+  // Use Report Status as status (Open / Closed / In Progress...)
+  const status = r["Report Status"] || "";
+
+  // Use Name (and fall back to ID if needed) as reporter
+  const reporter = r.Name || r.ID || "";
+
+  return {
+    id: idx + 1,
+    raw: r,
+    dateStr,
+    date,
+    location,
+    type,
+    risk,
+    status,
+    reporter
+  };
+});
+
 
       observationsAll = mapped;
       observationsLoaded = true;
