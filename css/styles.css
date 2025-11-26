@@ -2135,3 +2135,10 @@ body.dark-mode .obs-evidence-hint {
 body.dark-mode .obs-evidence-chip {
     background: rgba(59, 130, 246, 0.25);
 }
+
+
+.obs-evidence-links-line {
+    font-size: 0.8rem;
+    margin-bottom: 0.35rem;
+}
+
