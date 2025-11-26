@@ -1037,183 +1037,6 @@ function setupLibrarySwitcher() {
     return { label: 'STOP Man-basket Operations (>32km/h)', level: 'danger' };
   }
 
-
-function formatWindDirection(deg) {
-  if (deg == null || isNaN(deg)) return '';
-  const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-  const index = Math.round(deg / 45) % 8;
-  return dirs[index];
-}
-
-function updateHomeEnvironmentFromWeather(payload) {
-  const homeHeat = $('#homeHeatSummary');
-  const homeWind = $('#homeWindSummary');
-  const hint = $('#homeEnvHint');
-
-  if (!homeHeat || !homeWind) return;
-
-  const { tempC, humidity, windSpeed, windDir } = payload || {};
-
-  // ----- Heat index -----
-  let heatText = '--';
-  if (typeof tempC === 'number' && typeof humidity === 'number') {
-    const hiC = calculateHeatIndexC(tempC, humidity);
-    const risk = classifyHeatRisk(hiC);
-    if (hiC != null && !isNaN(hiC) && risk) {
-      const roundedHi = Math.round(hiC);
-      heatText = `${roundedHi}°C HI – ${risk.label}`;
-    }
-  }
-  homeHeat.textContent = heatText;
-
-  const homeHeatCard = homeHeat.closest('.home-env-card');
-  if (homeHeatCard) {
-    homeHeatCard.style.backgroundColor = 'var(--surface-soft)';
-    homeHeatCard.style.color = '';
-    homeHeatCard.style.border = '1px dashed rgba(148, 163, 184, 0.65)';
-  }
-
-  // ----- Wind -----
-  let windText = '--';
-  if (typeof windSpeed === 'number') {
-    const risk = classifyWindRisk(windSpeed);
-    const roundedWind = Math.round(windSpeed);
-    const dirLabel = formatWindDirection(windDir);
-    if (risk && risk.label) {
-      windText = dirLabel
-        ? `${roundedWind} km/h ${dirLabel} – ${risk.label}`
-        : `${roundedWind} km/h – ${risk.label}`;
-    } else {
-      windText = `${roundedWind} km/h`;
-    }
-  }
-  homeWind.textContent = windText;
-
-  const homeWindCard = homeWind.closest('.home-env-card');
-  if (homeWindCard) {
-    homeWindCard.style.backgroundColor = 'var(--surface-soft)';
-    homeWindCard.style.color = '';
-    homeWindCard.style.border = '1px dashed rgba(148, 163, 184, 0.65)';
-  }
-
-  if (hint) {
-    const bits = [];
-    if (typeof tempC === 'number') bits.push(`Temp ${Math.round(tempC)}°C`);
-    if (typeof humidity === 'number') bits.push(`RH ${Math.round(humidity)}%`);
-    if (typeof windSpeed === 'number') bits.push(`Wind ${Math.round(windSpeed)} km/h`);
-
-    if (bits.length) {
-      hint.textContent =
-        'Live data for your approximate location – ' +
-        bits.join(' · ') +
-        '. Always verify against site instruments before making safety decisions.';
-    } else {
-      hint.textContent =
-        'Unable to read full weather data. Please use site instruments and the Tools tab for manual calculations.';
-    }
-  }
-}
-
-function loadWeatherForCoords(lat, lon) {
-  const hint = $('#homeEnvHint');
-  const homeHeat = $('#homeHeatSummary');
-  const homeWind = $('#homeWindSummary');
-
-  if (homeHeat) homeHeat.textContent = 'Loading...';
-  if (homeWind) homeWind.textContent = 'Loading...';
-  if (hint) {
-    hint.textContent = 'Loading weather for your approximate location...';
-  }
-
-  const url =
-    'https://api.open-meteo.com/v1/forecast' +
-    `?latitude=${encodeURIComponent(lat)}` +
-    `&longitude=${encodeURIComponent(lon)}` +
-    '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m' +
-    '&timezone=auto';
-
-  fetch(url)
-    .then(res => {
-      if (!res.ok) {
-        throw new Error('Weather service error');
-      }
-      return res.json();
-    })
-    .then(data => {
-      const current = data && data.current;
-      if (!current) {
-        throw new Error('No current weather data returned');
-      }
-
-      updateHomeEnvironmentFromWeather({
-        tempC:
-          typeof current.temperature_2m === 'number'
-            ? current.temperature_2m
-            : null,
-        humidity:
-          typeof current.relative_humidity_2m === 'number'
-            ? current.relative_humidity_2m
-            : null,
-        windSpeed:
-          typeof current.wind_speed_10m === 'number'
-            ? current.wind_speed_10m
-            : null,
-        windDir:
-          typeof current.wind_direction_10m === 'number'
-            ? current.wind_direction_10m
-            : null
-      });
-    })
-    .catch(err => {
-      console.error('Weather fetch failed', err);
-      if (hint) {
-        hint.textContent =
-          'Unable to load weather for your location. Please check your connection or try again later.';
-      }
-    });
-}
-
-function askGeoAndLoadWeather() {
-  const hint = $('#homeEnvHint');
-
-  if (!navigator.geolocation) {
-    if (hint) {
-      hint.textContent =
-        'Geolocation is not supported on this device. Enter values manually in the Tools tab.';
-    }
-    return;
-  }
-
-  if (hint) {
-    hint.textContent =
-      'Getting your location (you may need to allow permission)...';
-  }
-
-  navigator.geolocation.getCurrentPosition(
-    pos => {
-      const { latitude, longitude } = pos.coords || {};
-      if (latitude == null || longitude == null) {
-        if (hint) {
-          hint.textContent =
-            'Could not read GPS coordinates. Please try again or use manual input in the Tools tab.';
-        }
-        return;
-      }
-      loadWeatherForCoords(latitude, longitude);
-    },
-    err => {
-      if (hint) {
-        hint.textContent =
-          'Unable to get your location: ' +
-          err.message +
-          '. You can still use the Tools tab for manual calculations.';
-      }
-    },
-    { enableHighAccuracy: true, timeout: 10000 }
-  );
-}
-
-
 function calculateHeatIndex() {
   const tempInput = $('#inputTemp');
   const humInput = $('#inputHumidity');
@@ -2003,17 +1826,46 @@ function showObservationDetail(obs) {
     ? obs.evidenceLinks
     : (obs.evidenceUrl ? [obs.evidenceUrl] : []);
 
+  // Transform Google Drive share links into direct image URLs where possible
+  const toImageUrl = (url) => {
+    if (!url) return '';
+    const trimmed = url.trim();
+    if (!/^https?:\/\//i.test(trimmed)) return '';
+    try {
+      const u = new URL(trimmed);
+      if (u.hostname.includes('drive.google.com')) {
+        // Patterns: /file/d/FILE_ID/..., or open?id=FILE_ID
+        let id = '';
+        const parts = u.pathname.split('/');
+        const fileIndex = parts.indexOf('d');
+        if (fileIndex !== -1 && parts.length > fileIndex + 1) {
+          id = parts[fileIndex + 1];
+        }
+        if (!id && u.searchParams.has('id')) {
+          id = u.searchParams.get('id');
+        }
+        if (id) {
+          return `https://drive.google.com/uc?export=view&id=${id}`;
+        }
+      }
+    } catch (e) {
+      // fall through
+    }
+    return trimmed;
+  };
+
   let evidenceSection = '';
   if (evidenceLinks.length) {
     const firstUrl = (evidenceLinks[0] || '').trim();
     const thumbsHtml = evidenceLinks
       .map((url, idx) => {
         const safeUrl = (url || '').trim();
-        if (!safeUrl || !/^https?:\/\//i.test(safeUrl)) return '';
+        const imgUrl = toImageUrl(safeUrl);
+        if (!imgUrl) return '';
         return `
           <figure class="obs-evidence-image-wrapper">
             <img
-              src="${safeUrl}"
+              src="${imgUrl}"
               alt="Observation evidence photo ${idx + 1}"
               class="obs-evidence-image"
               loading="lazy"
@@ -2022,6 +1874,7 @@ function showObservationDetail(obs) {
           </figure>
         `;
       })
+      .filter(Boolean)
       .join('');
 
     if (firstUrl && thumbsHtml.trim()) {
@@ -2466,7 +2319,11 @@ window.jsaData = [
 
 document.addEventListener('click', (e)=>{
   const t = e.target;
-  if (t && t.id === 'envEnableGeo'){
+  if (!t) return;
+  const btn = t.id === 'envEnableGeo'
+    ? t
+    : (t.closest ? t.closest('#envEnableGeo') : null);
+  if (btn){
     e.preventDefault();
     askGeoAndLoadWeather();
   }
