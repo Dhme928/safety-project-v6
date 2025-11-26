@@ -953,6 +953,16 @@ function setupLibrarySwitcher() {
   }
 
   function openLibrary(type) {
+    // Safety Handbook opens directly in a new tab (single document)
+    if (type === 'handbook') {
+      window.open(
+        'https://drive.google.com/file/d/1u9YAc-BggTUomhuF7Hz0-zDZdGFA0Rpt/view',
+        '_blank',
+        'noopener'
+      );
+      return;
+    }
+
     chooser.style.display = 'none';
     content.style.display = 'block';
 
@@ -960,8 +970,10 @@ function setupLibrarySwitcher() {
       titleEl.textContent = 'Job Safety Analysis Library';
       if (jsaSearchWrapper) jsaSearchWrapper.style.display = 'block';
       if (tbtSearchWrapper) tbtSearchWrapper.style.display = 'none';
+      if (csmSearchWrapper) csmSearchWrapper.style.display = 'none';
       jsaList.style.display = 'block';
       tbtList.style.display = 'none';
+      if (csmList) csmList.style.display = 'none';
     } else if (type === 'tbt') {
       titleEl.textContent = 'Tool Box Talk Library';
       if (jsaSearchWrapper) jsaSearchWrapper.style.display = 'none';
