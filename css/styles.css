@@ -503,32 +503,6 @@ body.dark-mode #emergencyQuickButton {
     font-size: 0.75rem;
     color: var(--text-soft);
 }
-.home-env-location-btn {
-    margin-top: 0;
-    padding: 0.3rem 0.85rem;
-    font-size: 0.75rem;
-    border: none;
-    border-radius: 999px;
-    background: linear-gradient(to right, var(--primary-start), var(--primary-end));
-    color: #ffffff;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.12);
-    white-space: nowrap;
-}
-
-.home-env-location-btn:disabled {
-    opacity: 0.7;
-    cursor: default;
-    box-shadow: none;
-}
-
-.home-env-location-btn i {
-    font-size: 0.8rem;
-}
-
 
 .month-color-line {
     font-size: 0.85rem;
@@ -2041,4 +2015,122 @@ a {
     .table-scroll {
         max-height: 450px;
     }
+}
+
+
+.home-env-location-btn {
+    margin-top: 0;
+    padding: 0.3rem 0.85rem;
+    font-size: 0.75rem;
+    border: none;
+    border-radius: 999px;
+    background: linear-gradient(to right, var(--primary-start, #2563eb), var(--primary-end, #1d4ed8));
+    color: #ffffff;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.12);
+    white-space: nowrap;
+}
+
+.home-env-location-btn:disabled {
+    opacity: 0.7;
+    cursor: default;
+    box-shadow: none;
+}
+
+.home-env-location-btn i {
+    font-size: 0.8rem;
+}
+
+/* Observation evidence section */
+.obs-evidence-box {
+    margin-top: 0.4rem;
+    border-radius: 14px;
+    background: #f9fafb;
+    border: 1px dashed rgba(148, 163, 184, 0.7);
+    padding: 0.65rem 0.8rem 0.75rem;
+}
+
+.obs-evidence-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.8rem;
+    color: #2563eb;
+    text-decoration: none;
+    margin-bottom: 0.55rem;
+}
+
+.obs-evidence-link i {
+    font-size: 0.8rem;
+}
+
+.obs-evidence-images-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 0.5rem;
+    margin-bottom: 0.4rem;
+}
+
+.obs-evidence-image-wrapper {
+    border-radius: 12px;
+    overflow: hidden;
+    background: #e5e7eb;
+    position: relative;
+}
+
+.obs-evidence-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.obs-evidence-caption {
+    position: absolute;
+    left: 0.4rem;
+    bottom: 0.35rem;
+    padding: 0.12rem 0.45rem;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.75);
+    color: #f9fafb;
+    font-size: 0.7rem;
+}
+
+.obs-evidence-hint {
+    font-size: 0.75rem;
+    color: var(--text-soft, #6b7280);
+}
+
+/* Dark mode */
+body.dark-mode .obs-evidence-box {
+    background: rgba(15, 23, 42, 0.96);
+    border-color: rgba(148, 163, 184, 0.7);
+}
+
+body.dark-mode .obs-evidence-hint {
+    color: #9ca3af;
+}
+
+/* Evidence chip on list cards */
+.obs-evidence-chip {
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    background: rgba(59, 130, 246, 0.12);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 0.25rem;
+}
+
+.obs-evidence-chip i {
+    font-size: 0.8rem;
+    color: #2563eb;
+}
+
+body.dark-mode .obs-evidence-chip {
+    background: rgba(59, 130, 246, 0.25);
 }
