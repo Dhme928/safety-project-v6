@@ -1,70 +1,83 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1, user-scalable=no"
-    >
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
 
     <!-- Icons & Fonts -->
-    <link
-        rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
-    >
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
     <link
         href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Poppins:wght@600;700&display=swap"
         rel="stylesheet"
-    >
+    />
 
-    <!-- App Icons (same as your original file) -->
-    <link
-        rel="apple-touch-icon"
-        href="https://drive.google.com/uc?export=view&id=1pT2_mI_B9CrnOde6YK__OzBd2gYEppXy"
-    >
+    <!-- App Icon -->
     <link
         rel="icon"
         type="image/png"
         href="https://drive.google.com/uc?export=view&id=1pT2_mI_B9CrnOde6YK__OzBd2gYEppXy"
-    >
+    />
 
     <title>My Observations App 👷🏻‍♂️</title>
 
-    <!-- Main Styles -->
-    <link rel="stylesheet" href="css/styles.css">
+    <!-- Main styles -->
+    <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body class="light-mode">
+<div class="app-container">
 
-<!-- 🏆 Leaderboard Modal -->
-<div id="leaderboardModal" class="modal">
-    <div class="modal-content">
-        <span class="close-btn" onclick="hideLeaderboardModal()">&times;</span>
-        <h2>🏆 Monthly Leaderboard</h2>
-        <div id="leaderboardContainer">
-            <div class="loading-spinner">
-                <i class="fas fa-spinner fa-spin"></i> Loading leaderboard...
+    <!-- HEADER -->
+    <header class="app-header">
+        <div class="header-title-area">
+            <img
+                src="img/CAT.jpeg"
+                alt="Safety Group Logo"
+                class="header-logo"
+            />
+            <div class="header-text">
+                <h1>My Observations App</h1>
+                <p class="header-subtitle">By Saudi Safety Group</p>
+            </div>
+        </div>
+        <button class="mode-toggle" type="button" aria-label="Toggle dark mode">
+            <i id="modeIcon" class="fas fa-moon"></i>
+        </button>
+    </header>
+
+    <!-- LEADERBOARD MODAL -->
+    <div id="leaderboardModal" class="modal">
+        <div class="modal-content">
+            <button class="close-btn" type="button" onclick="hideLeaderboardModal()">
+                &times;
+            </button>
+            <h2>🏆 Monthly Leaderboard</h2>
+            <div id="leaderboardContainer">
+                <div class="loading-spinner">
+                    <i class="fas fa-spinner fa-spin"></i> Loading leaderboard...
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<!-- 🆘 Emergency Contacts Modal -->
-<div id="emergencyContactsModal" class="modal">
-    <div class="modal-content">
-        <span class="close-btn" onclick="hideEmergencyContactsModal()">&times;</span>
-        <h2>🆘 EMERGENCY CONTACTS</h2>
+    <!-- EMERGENCY CONTACTS MODAL -->
+    <div id="emergencyContactsModal" class="modal">
+        <div class="modal-content">
+            <button class="close-btn" type="button" onclick="hideEmergencyContactsModal()">
+                &times;
+            </button>
+            <h2>🆘 Emergency Contacts</h2>
 
-        <div id="emergencyContactsTableContainer" style="overflow-x:auto;">
-            <table style="width:100%; border-collapse: collapse; margin-top: 15px;">
-                <thead>
+            <h3>Internal</h3>
+            <div class="table-scroll">
+                <table class="emergency-table">
+                    <thead>
                     <tr>
                         <th>Name</th>
                         <th>Designation</th>
                         <th>Contact No.</th>
                     </tr>
-                </thead>
-                <tbody>
-                    <!-- Same internal emergency contacts as your original index.html -->
+                    </thead>
+                    <tbody>
                     <tr><td>CAT EMERGENCY</td><td>EMERGENCY</td><td><a href="tel:0543133645">054 313 3645</a></td></tr>
                     <tr><td>HARADH CLINIC</td><td>Haradh Clinic</td><td><a href="tel:0569180911">056 918 0911</a></td></tr>
                     <tr><td>Maher A. Jardali</td><td>Operation Manager</td><td><a href="tel:0505817134">050 581 7134</a></td></tr>
@@ -81,201 +94,246 @@
                     <tr><td>Irfan Haider</td><td>HSSE Supervisor</td><td><a href="tel:0590654748">059 065 4748</a></td></tr>
                     <tr><td>Taha Ghemrawi</td><td>Sr. Transport Officer</td><td><a href="tel:0539195375">053 919 5375</a></td></tr>
                     <tr><td>Abdul Karim</td><td>Material Supervisor</td><td><a href="tel:0502884442">050 288 4442</a></td></tr>
-                    <tr><td>Arif Khan</td><td>Safety officer/BLS/First Ajder</td><td><a href="tel:0576563119">057 656 3119</a></td></tr>
+                    <tr><td>Arif Khan</td><td>Safety officer/BLS/First Aider</td><td><a href="tel:0576563119">057 656 3119</a></td></tr>
                     <tr><td>Dr. Ahmed Hussein</td><td>CAT Doctor</td><td><a href="tel:0562535421">056 253 5421</a></td></tr>
                     <tr><td>Romelle M. Pagayon</td><td>Male Nurse</td><td><a href="tel:0531551924">053 155 1924</a></td></tr>
                     <tr><td>Joe Franco V. Yabut</td><td>CAT First aider</td><td><a href="tel:0506735217">050 673 5217</a></td></tr>
-                    <tr><td>Shahid Bhatti</td><td>Ambulance Driver</td><td><a href="tel:0593886520">059 388 6520</a></td></tr>
-                </tbody>
-            </table>
-        </div>
+                    <tr><td>Shahid Bhatti</td><td>Ambulance Driver</td><td><a href="tel:0593886520">059 3886520</a></td></tr>
+                    </tbody>
+                </table>
+            </div>
 
-        <h3 style="margin-top:25px;">External Emergency Contacts</h3>
-        <table style="width:100%; border-collapse: collapse; font-size:13.5px;">
-            <thead>
-                <tr>
-                    <th>Description</th>
-                    <th>Tel. Numbers</th>
-                    <th>Description</th>
-                    <th>Tel. Numbers</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr><td>Southern Area (Abqaiq)</td><td><a href="tel:0135720911">013 572 0911</a></td><td>Civil Defense (Fire)</td><td><a href="tel:998">998</a></td></tr>
-                <tr><td>Nadec Hospital (Haradh)</td><td><a href="tel:0135849000">013 584 9000</a></td><td>Red Crescent (Ambulance)</td><td><a href="tel:997">997</a></td></tr>
-                <tr><td>Al Ahsa Hospital (Al Hofuf)</td><td><a href="tel:0135844000">013 584 4000</a></td><td>Local Police</td><td><a href="tel:999">999</a></td></tr>
-                <tr><td></td><td></td><td>Local Traffic Accident</td><td><a href="tel:993">993</a></td></tr>
-            </tbody>
-        </table>
+            <h3 style="margin-top: 1.5rem;">External</h3>
+            <div class="table-scroll">
+                <table class="emergency-table">
+                    <thead>
+                    <tr>
+                        <th>Description</th>
+                        <th>Tel. Numbers</th>
+                        <th>Description</th>
+                        <th>Tel. Numbers</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr><td>Southern Area (Abqaiq)</td><td><a href="tel:0135720911">013 572 0911</a></td><td>Civil Defense (Fire)</td><td><a href="tel:998">998</a></td></tr>
+                    <tr><td>Nadec Hospital (Haradh)</td><td><a href="tel:0135849000">013 584 9000</a></td><td>Red Crescent (Ambulance)</td><td><a href="tel:997">997</a></td></tr>
+                    <tr><td>Al Ahsa Hospital (Al Hofuf)</td><td><a href="tel:0135844000">013 584 4000</a></td><td>Local Police</td><td><a href="tel:999">999</a></td></tr>
+                    <tr><td></td><td></td><td>Local Traffic Accident</td><td><a href="tel:993">993</a></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
-</div>
 
-<!-- 🚫 JSA confirmation modal REMOVED on purpose (opens directly now) -->
-
-<!-- MAIN APP -->
-<div class="app-container">
-    <header class="header">
-        <span>My Observations App 👷🏻‍♂️</span>
-        <div class="mode-toggle" onclick="toggleDarkMode()">
-            <i id="modeIcon" class="fas fa-moon"></i>
-        </div>
-    </header>
-
+    <!-- MAIN CONTENT -->
     <main class="content-area">
-        <!-- 🏠 HOME / DASHBOARD TAB -->
+
+        <!-- HOME TAB -->
         <section id="HomeTab" class="tab-content active">
-            <!-- Top KPI strip -->
-            <div class="home-summary-grid">
-                <div class="home-summary-card">
-                    <div class="home-summary-label">Observers Today</div>
-                    <div class="home-summary-value" id="homeObserversToday">--</div>
+            <div class="home-kpi-row">
+                <div class="home-kpi-card">
+                    <div class="home-kpi-label">Observers Today</div>
+                    <div class="home-kpi-value" id="homeObserversToday">--</div>
                 </div>
-                <div class="home-summary-card">
-                    <div class="home-summary-label">Observations Today</div>
-                    <div class="home-summary-value" id="homeObservationsToday">--</div>
+                <div class="home-kpi-card">
+                    <div class="home-kpi-label">Observations Today</div>
+                    <div class="home-kpi-value" id="homeObservationsToday">--</div>
                 </div>
-                <div class="home-summary-card">
-                    <div class="home-summary-label">Open High-Risk</div>
-                    <div class="home-summary-value" id="homeHighRiskOpen">--</div>
+                <div class="home-kpi-card">
+                    <div class="home-kpi-label">Open High-Risk</div>
+                    <div class="home-kpi-value" id="homeHighRiskOpen">--</div>
                 </div>
             </div>
 
-            <!-- TBT of the day -->
-            <div class="home-section-card" id="homeTbtSection">
-                <div class="home-section-header">
+            <section class="home-card" id="homeTbtSection">
+                <header class="home-card-header">
                     <h3><i class="fas fa-book-open"></i> TBT of The Day</h3>
-                </div>
+                </header>
                 <div id="homeTbtContent">
                     Loading TBT of the day...
                 </div>
-            </div>
+            </section>
+            <p class="month-color-line">
+                <span class="month-color-label">The Color Code of This Month is:</span>
+                <span id="colorName">...</span>
+            </p>
 
-            <!-- Mini leaderboard -->
-            <div class="home-section-card" id="homeLeaderboardSection">
-                <div class="home-section-header">
-                    <h3><i class="fas fa-trophy"></i> Top 3 This Month</h3>
-                    <button class="home-link-btn" onclick="showLeaderboardModal()">Full leaderboard</button>
-                </div>
-                <div id="homeLeaderboardMini">
-                    Loading leaderboard...
-                </div>
-            </div>
 
-            <!-- Environment status -->
-            <div class="home-section-card" id="homeEnvSection">
-                <div class="home-section-header">
+            <section class="home-card">
+                <header class="home-card-header">
                     <h3><i class="fas fa-temperature-high"></i> Environment Status</h3>
-                </div>
+                    <button
+                        type="button"
+                        class="gps-btn home-env-location-btn"
+                        id="envEnableGeo"
+                    >
+                        <i class="fas fa-location-crosshairs"></i>
+                        Use my location
+                    </button>
+                </header>
                 <div class="home-env-grid">
-                    <div class="home-env-item">
+                    <div class="home-env-card">
                         <div class="home-env-label">Heat Index</div>
                         <div class="home-env-value" id="homeHeatSummary">--</div>
                     </div>
-                    <div class="home-env-item">
+                    <div class="home-env-card">
                         <div class="home-env-label">Wind</div>
                         <div class="home-env-value" id="homeWindSummary">--</div>
                     </div>
                 </div>
-                <div class="home-env-hint">
-                    Use <strong>Tools</strong> tab for detailed Heat &amp; Wind calculations.
-                </div>
-            </div>
+                <p class="home-env-hint" id="homeEnvHint">
+                    Click <strong>Use my location</strong> to load current Heat Index and Wind
+                    for your approximate area. Always confirm with site instruments and your
+                    HSSE procedures before making safety decisions.
+                </p>
+            </section>
 
-            <!-- Month color -->
-            <div class="info-month">
-                This Month Color Code: <span id="colorName">...</span>
-            </div>
 
-            <!-- Employee of the Month -->
-            <div class="announcement-card" id="eomCard" style="border:2px solid gold; cursor:pointer;">
-                <div class="card-title" id="eomCardTitle">
-                    <i class="fas fa-trophy"></i> Employee of the Month:
+            <section class="home-card highlight-card">
+                <header class="home-card-header">
+                    <h3><i class="fas fa-award"></i> Employee of the Month</h3>
+                </header>
+                <div id="employeeOfMonth">Loading...</div>
+            </section>
+            <section class="home-card">
+                <header class="home-card-header">
+                    <h3><i class="fas fa-trophy"></i> Top Best Safety of This Month</h3>
+                    <button class="link-button" type="button" onclick="showLeaderboardModal()">
+                        Full leaderboard
+                    </button>
+                </header>
+                <div id="homeLeaderboardMini">
+                    Loading leaderboard...
                 </div>
-                <div class="card-content" id="employeeOfMonth" style="display:block;">
-                    Loading...
-                </div>
-            </div>
+            </section>
+            <button
+                class="accordion accordion-modal"
+                type="button"
+                onclick="showLeaderboardModal()">
+                <i class="fas fa-trophy"></i> Monthly Leaderboard
+            </button>
 
-            <!-- Emergency procedures -->
-            <button class="accordion" id="reportingAccordion" data-color="#ffc107">
+            <button
+                class="accordion accordion-modal"
+                type="button"
+                onclick="showEmergencyContactsModal()">
+                <i class="fas fa-ambulance"></i> Emergency Contacts
+            </button>
+
+            <button class="accordion">
                 <i class="fas fa-exclamation-triangle"></i> EMERGENCY REPORTING PROCEDURES
             </button>
-            <div class="panel" id="reportingPanel">
+            <div class="panel">
                 <ol>
                     <li>Dial the emergency number.</li>
                     <li>Describe the exact location of the emergency.</li>
                     <li>Describe the nature of the emergency.</li>
-                    <li>Identify the required service (Fire, Ambulance, Security) and repeat the message.</li>
+                    <li>Identify the required service and repeat the message.</li>
                     <li>Answer all questions from the operator.</li>
                     <li>Do not hang up until instructed.</li>
                 </ol>
-                <button onclick="getGPSLocation()" class="gps-btn">
-                    <i class="fas fa-map-marker-alt"></i> Share My Location (GPS)
+                <button class="gps-btn" type="button" onclick="getGPSLocation()">
+                    <i class="fas fa-map-marker-alt"></i>
+                    Share My Location (GPS)
                 </button>
                 <div id="locationResult" class="gps-result"></div>
             </div>
 
-            <!-- Evacuation tips -->
-            <button class="accordion" id="evacuationAccordion" data-color="var(--success-color)">
+            <button class="accordion">
                 <i class="fas fa-door-open"></i> EVACUATION TIPS
-            </button>
-            <div class="panel" id="evacuationPanel">
-                <ul>
-                    <li>Stop all work and shut down all equipment.</li>
-                    <li>Warn nearby personnel and proceed to the assembly area.</li>
-                    <li>Conduct roll call; account for all personnel.</li>
-                    <li>Wait for permission before re-entering the work area.</li>
-                </ul>
-            </div>
-
-            <!-- Safety responsibilities (kept from your original content) -->
-            <button class="accordion" id="safetyAccordion" data-color="#007bff">
-                <i class="fas fa-user-shield"></i> Safety Responsibilities
-            </button>
-            <div class="panel" id="safetyPanel">
-                <ol>
-                    <li>Report to site HSE / Safety Supervisor, Coordinator &amp; Manager.</li>
-                    <li>Demonstrate priority of safety by example.</li>
-                    <li>Understand contract HSE requirements (CSSP, HIP, JSA, GI’s, CSM, etc.).</li>
-                    <li>Conduct TBTs with workers and site supervision; maintain records.</li>
-                    <li>Conduct frequent HSE inspections and monitor activities.</li>
-                    <li>Report all NM, FAI, CA &amp; PA to the HSE Supervisor.</li>
-                    <li>Report all incidents causing injury or property damage.</li>
-                    <li>Report misuse of equipment, tools, or facilities.</li>
-                    <li>Report prejudice, bullying, or fighting immediately.</li>
-                    <li>Report any other HSE concerns.</li>
-                    <li>Ensure presence on site while activities are ongoing.</li>
-                    <li>Ensure proper and accurate reporting of all HSE issues.</li>
-                    <li>Follow up on all site HSE issues and close actions.</li>
-                    <li>Monitor &amp; close all PSI points, HSE findings &amp; observations.</li>
-                    <li>Ensure equipment is safe and operators are competent &amp; certified.</li>
-                    <li>Ensure scaffoldings, ladders, tools &amp; electrical equipment are safe.</li>
-                    <li>Maintain tidy jobsite; remove waste daily.</li>
-                    <li>Stop work if unsafe conditions exist (Stop Work Authority).</li>
-                    <li>Participate in incident investigations, drills, and trainings.</li>
-                    <li>Assist implementation of waste management plans.</li>
-                </ol>
-            </div>
-
-            <!-- TBT full panel -->
-            <button class="accordion" id="tbtAccordion" data-color="var(--primary-color)">
-                <i class="fas fa-book-open"></i> Full TBT Details
-            </button>
-            <div class="panel" id="tbtPanel"></div>
-
-            <!-- Useful links -->
-            <button class="accordion" data-color="#6f42c1">
-                <i class="fas fa-link"></i> Useful Links
             </button>
             <div class="panel">
                 <ul>
-                    <li><a href="https://drive.google.com/file/d/1JS1VQKXLHdOOFXpYcpRftM-kviBv-TYd/view?usp=sharing" target="_blank">📘 CSM Book</a></li>
-                    <li><a href="https://drive.google.com/file/d/109vG3Hk3PdgvQF87k0EJ1IiKDTDfdQTv/view?usp=sharing" target="_blank">📗 Saudi Aramco Safety Handbook</a></li>
+                    <li>Stop work and shut down all equipment safely.</li>
+                    <li>Warn nearby personnel and move to assembly area.</li>
+                    <li>Conduct roll call and account for all personnel.</li>
+                    <li>Do not re-enter the area until authorized.</li>
+                </ul>
+            </div>
+
+            <button class="accordion">
+                <i class="fas fa-user-shield"></i> Safety Responsibilities
+            </button>
+            <div class="panel">
+                <ol>
+                    <li>Reporting chain to follow site HSE / Safety supervisor, Coordinator & Manager.</li>
+                    <li>Visibly demonstrate the priority of safety in all activities, including setting a good personal example.</li>
+                    <li>Understand & familiar with safety and health requirements of the contract as well as the CSSP, HIP, JSA, GI’s, CSM, including local laws and all other best practices.</li>
+                    <li>Conducting all TBTs (Daily, weekly & Mass) with site workers and construction supervisory staff and hand over accurate record to HSE supervisor at the end of each shift.</li>
+                    <li>Conducting frequent HSE inspections of his assigned location and perform continuous monitoring of ongoing activities.</li>
+                    <li>Report all NM, FAI, CA & PA to your immediate HSE supervisor.</li>
+                    <li>Report all incidents that result in injury or damage to property to your immediate HSE supervisor.</li>
+                    <li>Report misuse of equipment, tools, facilities or any other entity to your immediate HSE supervisor.</li>
+                    <li>Report any severe arguments, signs of prejudice, bullying or fighting to your immediate HSE supervisor.</li>
+                    <li>Report any other Health, Safety or Environmental concerns to your immediate HSE supervisor.</li>
+                    <li>Report unsafe situations observed & all unsafe occurrences immediately.</li>
+                    <li>Be vigilant and present at site location all the time while the activities are ongoing for the safe operation.</li>
+                    <li>Responsible and accountable for correct and in time reporting of all HSE issues to assigned HSE supervisor.</li>
+                    <li>Whenever the Safety Officer have concern related to HSE; report this immediately to party in-charge (Foreman, Supervisor or site engineer) no matter what the action will be taken. A report shall be passed to the HSE Supervisor or HSE Coordinator / Manager.</li>
+                    <li>Any mistreated behavior; safety officer shall immediately report and submit a written report to the HSE Supervisor or HSE Coordinator/ Manager.</li>
+                    <li>Fill the observation form clearly and concisely for all unsafe occurrences and get signatures of the activity foreman/supervisor/site engineer and hand over to HSE supervisor.</li>
+                    <li>Maintain accurate records of activities related to H.S.E.</li>
+                    <li>Liaise with Client representatives if instruction given by HSE Supervisor, Coordinator and Manager.</li>
+                    <li>Responsible for monitoring and closure of all site related PSI points, HSE findings/observations raised during audit, inspections or site visits by client/management.</li>
+                    <li>Follow up with construction site supervision about all site HSE issues and concerns for necessary closure.</li>
+                    <li>Providing correctly and accurately filled all necessary checklists which are not limited to (heavy equipment checklist, daily site inspection checklist, portable electric tools etc.)</li>
+                    <li>Inspection and monitoring of all activities of sub-contractors to comply with OHS management system.</li>
+                    <li>Ensure that subcontractors and visitors have received safety orientation prior to enter to the site.</li>
+                    <li>Ensure that all equipment is in a safe working condition, report abnormalities immediately.</li>
+                    <li>Ensure that at no N.D.E. shall be carried out if it may endanger any person.</li>
+                    <li>Ensuring 100% work permit system compliance at site (Client and CAT).</li>
+                    <li>Ensure that equipment operators are competent and possess required valid certificates.</li>
+                    <li>Carry out monthly inspection which are not limited to (fire extinguishers, rigging & lifting equipment etc.)</li>
+                    <li>Ensure that all tools and Electrical Equipment are in good order and do not pose a danger to employees.</li>
+                    <li>Ensure that Scaffolding platform and Ladders are safe, secured, inspected & tagged before use.</li>
+                    <li>Ensure that the jobsite is kept tidy and waste materials are removed at the end of each shift.</li>
+                    <li>Stop work as per HSI 063 and Area Manager Stop Work Authority Policy.</li>
+                    <li>Participate/conduct incident investigations, safety meetings, drills, safety training sessions, etc.</li>
+                    <li>Assist in implementation of waste management plan at project site as well as at camp.</li>
+                    <li>Follow and implement all written/verbal business related instructions given to you from your seniors.</li>
+                </ol>
+            </div>
+
+            <button class="accordion">
+                <i class="fas fa-link"></i> Useful Links
+            </button>
+            <div class="panel">
+                <ul class="links-list">
+                    <li>
+                        <a href="https://drive.google.com/file/d/1JS1VQKXLHdOOFXpYcpRftM-kviBv-TYd/view?usp=sharing" target="_blank">
+                            📘 CSM Book
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://drive.google.com/file/d/109vG3Hk3PdgvQF87k0EJ1IiKDTDfdQTv/view?usp=sharing" target="_blank">
+                            📗 Saudi Aramco Safety Handbook
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <button class="accordion">
+                <i class="fa-solid fa-exclamation"></i> About
+            </button>
+            <div class="panel">
+                <ul class="links-list">
+                    <li> This Application was developed by
+                        <a href="https://www.linkedin.com/in/3nzi?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=ios_app">
+                            Abdulrahman Alanazi [8222802]
+                        </a>
+                        under the guidance and support of his supervisor <a href="https://www.linkedin.com/in/abdullah-alkaluf?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=ios_app">
+                            Abdullah Alkaluf [8230855]
+                        </a>
+                         and Other Saudi Safety Officers.
+                    </li>
+                    <li> For any Question or Information Catproject404@gmail.com
+                        </a>
+                    </li>
                 </ul>
             </div>
         </section>
 
-        <!-- 📊 OBSERVATIONS TAB (desktop table + mobile cards) -->
+        <!-- OBSERVATIONS TAB -->
         <section id="ObservationsTab" class="tab-content">
             <div class="obs-summary-bar">
                 <div class="obs-summary-item">
@@ -314,82 +372,140 @@
                     </select>
                 </div>
                 <div class="obs-filter-row">
-                    <input type="text" id="obsSearch" placeholder="Search by location, type, reporter...">
+                    <input type="text" id="obsSearch" placeholder="Search by location, type, reporter..." />
                 </div>
             </div>
 
             <div id="observationsList"></div>
 
-            <button id="openSheetButton" class="obs-open-sheet-btn">
-                <i class="fas fa-table"></i> Open full data sheet
+            <button id="openSheetButton" class="obs-open-sheet-btn" type="button">
+                <i class="fas fa-table"></i>
+                Open full data sheet
             </button>
 
-            <div id="observationsEmptyState" class="obs-empty-state" style="display:none;">
+            <div id="observationsEmptyState" class="obs-empty-state" style="display: none;">
                 <i class="fas fa-database"></i>
-                <p>No observations data loaded. Check observations configuration in <code>js/data.js</code>.</p>
+                <p>No observations data loaded yet.</p>
             </div>
         </section>
 
-        <!-- ✅ DAILY TASKS (Google Form) -->
+        <!-- TASKS TAB -->
         <section id="TasksTab" class="tab-content">
             <iframe
                 id="tasksIframe"
-                src="https://docs.google.com/forms/d/e/1FAIp...pRf0G37tZzqbY-AF-BHfbXXiLr2rKA/viewform?embedded=true"
-            ></iframe>
+                title="Daily tasks form"
+                frameborder="0"
+                marginheight="0"
+                marginwidth="0"
+            >
+                Loading…
+            </iframe>
         </section>
 
-        <!-- 📚 LIBRARY TAB (TBT list + JSA list) -->
+        <!-- LIBRARY TAB (chooser + content) -->
         <section id="JSATab" class="tab-content">
-            <div class="library-layout">
-                <div class="library-column">
-                    <h3><i class="fas fa-book-open"></i> TBT Library</h3>
-                    <div id="tbtLibraryList">
-                        <!-- Filled from tbtData in js/data.js -->
-                    </div>
+
+            <!-- First view: chooser with two big blocks -->
+            <div id="libraryChooser" class="library-chooser">
+                <div class="library-choice-card library-card" data-library="jsa">
+                    <i class="fa-solid fa-book" style="color: #B197FC;"></i>
+                    <h3>Job Safety Analysis Library</h3>
+                    <p>Browse JSA documents for key activities.</p>
                 </div>
-                <div class="library-column">
-                    <h3><i class="fas fa-file-alt"></i> JSA Library</h3>
+                <div class="library-choice-card library-card" data-library="tbt">
+                    <i class="fas fa-book-open"></i>
+                    <h3>Tool Box Talk Library</h3>
+                    <p>Browse TBTs for daily safety briefings.</p>
+                </div>
+<div class="library-choice-card library-card" data-library="csm">
+<i class="fa-regular fa-helmet-safety" style="color: #63E6BE;"></i>
+  <h3>Construction Safety Manual (CSM)</h3>
+  <p>Browse CSM chapters, guidelines & procedures.</p>
+</div>
+
+            </div>
+
+            <!-- Second view: actual library (JSA or TBT) -->
+            <div id="libraryContent" class="library-content" style="display: none;">
+                <button id="libraryBackButton" type="button" class="library-back">
+                    <i class="fas fa-arrow-left"></i> Back to library menu
+                </button>
+
+                <h2 id="libraryTitle" class="library-title">
+                    Library
+                </h2>
+
+                <!-- JSA search bar -->
+                <div id="libraryJsaSearchWrapper" class="library-search" style="display: none;">
                     <input
                         type="text"
                         id="jsaSearch"
-                        placeholder="Search JSA titles (e.g., Loading unloading)..."
-                    >
-                    <div id="jsaListContainer"></div>
+                        placeholder="Search JSA titles (e.g., scaffolding, lifting)..." />
                 </div>
+
+                <!-- TBT search bar -->
+                <div id="libraryTbtSearchWrapper" class="library-search" style="display: none;">
+
+                    <input
+                        type="text"
+                        id="tbtSearch"
+                        placeholder="Search TBT titles (e.g., PPE, lifting)..." />
+                </div>
+
+                <!-- Lists filled by app.js -->
+                <div id="jsaListContainer" class="library-list" style="display: none;"></div>
+                
+
+<!-- CSM search bar -->
+<div id="libraryCsmSearchWrapper" class="library-search" style="display: none;">
+  <input type="text" id="csmSearch" placeholder="Search CSM titles (e.g., lifting, excavation, PPE)..." />
+</div>
+<div id="tbtLibraryList" class="library-list" style="display: none;"></div>
+<!-- CSM list -->
+<div id="csmLibraryList" class="library-list" style="display: none;"></div>
+
             </div>
         </section>
 
-        <!-- 🧮 TOOLS TAB (KPI / Heat / Wind) -->
+        <!-- TOOLS TAB -->
         <section id="ToolsTab" class="tab-content">
             <div class="tool-toggle-container">
-                <button class="tool-toggle-btn active-tool" data-tool="kpi" onclick="switchTool('kpi')">Safety KPIs</button>
-                <button class="tool-toggle-btn" data-tool="heat" onclick="switchTool('heat')">Heat Stress</button>
-                <button class="tool-toggle-btn" data-tool="wind" onclick="switchTool('wind')">Wind Limits</button>
+                <button class="tool-toggle-btn active-tool" type="button" data-tool="kpi">
+                    Safety KPIs
+                </button>
+                <button class="tool-toggle-btn" type="button" data-tool="heat">
+                    Heat Stress
+                </button>
+                <button class="tool-toggle-btn" type="button" data-tool="wind">
+                    Wind Limits
+                </button>
             </div>
 
-            <!-- KPI Section -->
-            <div id="kpiSection">
+            <!-- KPI CARD -->
+            <section id="kpiSection" class="home-card tools-card">
                 <div class="tools-section-header">
                     <i class="fas fa-calculator"></i>
                     <div>
-                        <h3>Safety KPI Calculator</h3>
-                        <small>Based on Saudi Aramco CSM &amp; Safety Handbook</small>
+                        <h3>Safety KPI Helper</h3>
+                        <small>Use this area to keep track of key indicators.</small>
                     </div>
                 </div>
-                <div id="kpiListContainer"></div>
-            </div>
+                <p class="tools-note">
+                    (You can later replace this with your own KPI formulas and cards.)
+                </p>
+            </section>
 
-            <!-- Heat Stress Section -->
-            <div id="heatStressSection" style="display:none;">
+            <!-- HEAT STRESS CARD -->
+            <section id="heatStressSection" class="home-card tools-card" style="display: none;">
                 <div class="tools-section-header heat">
                     <i class="fas fa-sun"></i>
                     <div>
                         <h3>Heat Stress Calculator</h3>
-                        <small>Calculate Heat Index &amp; Hazard Level</small>
+                        <small>Calculate Heat Index &amp; risk level</small>
                     </div>
                 </div>
 
-                <div class="kpi-card heat">
+                <div class="kpi-card">
                     <div class="kpi-input-group">
                         <label>Air Temperature (°C)</label>
                         <input
@@ -398,7 +514,7 @@
                             class="kpi-input-field"
                             placeholder="e.g., 35"
                             oninput="calculateHeatIndex()"
-                        >
+                        />
                     </div>
                     <div class="kpi-input-group">
                         <label>Relative Humidity (%)</label>
@@ -408,33 +524,31 @@
                             class="kpi-input-field"
                             placeholder="e.g., 40"
                             oninput="calculateHeatIndex()"
-                        >
+                        />
                     </div>
                 </div>
 
-                <div id="heatIndexResultCard">
-                    <div>HEAT INDEX</div>
-                    <div class="heat-value" id="heatIndexValue">--</div>
-                    <div class="heat-category" id="heatRiskLevel">--</div>
-                    <div class="heat-recommendations">
-                        <ul id="heatRecommendationsList">
-                            <li>Enter temperature and humidity to see results.</li>
-                        </ul>
-                    </div>
+                <div id="heatIndexResultCard" class="result-card">
+                    <div class="result-label">Heat Index</div>
+                    <div class="result-main" id="heatIndexValue">--</div>
+                    <div class="result-tag" id="heatRiskLevel">--</div>
+                    <ul class="result-list" id="heatRecommendationsList">
+                        <li>Enter temperature and humidity to see results.</li>
+                    </ul>
                 </div>
-            </div>
+            </section>
 
-            <!-- Wind Speed Section -->
-            <div id="windSpeedSection" style="display:none;">
+            <!-- WIND SPEED CARD -->
+            <section id="windSpeedSection" class="home-card tools-card" style="display: none;">
                 <div class="tools-section-header wind">
                     <i class="fas fa-wind"></i>
                     <div>
                         <h3>Wind Speed Safety Limits</h3>
-                        <small>Based on CSM Vol II (Cranes &amp; Manbaskets)</small>
+                        <small>Based on crane &amp; man-basket limits</small>
                     </div>
                 </div>
 
-                <div class="kpi-card wind">
+                <div class="kpi-card">
                     <div class="kpi-input-group">
                         <label>Current Wind Speed (km/h)</label>
                         <input
@@ -443,24 +557,22 @@
                             class="kpi-input-field"
                             placeholder="e.g., 25"
                             oninput="calculateWindSafety()"
-                        >
+                        />
                     </div>
                 </div>
 
-                <div id="windSpeedResultCard">
-                    <div>STATUS</div>
-                    <div class="wind-value" id="windValue">--</div>
-                    <div class="wind-category" id="windRiskLevel">--</div>
-                    <div class="wind-recommendations">
-                        <ul id="windRecommendationsList">
-                            <li>Enter wind speed to see limits.</li>
-                        </ul>
-                    </div>
+                <div id="windSpeedResultCard" class="result-card">
+                    <div class="result-label">Status</div>
+                    <div class="result-main" id="windValue">--</div>
+                    <div class="result-tag" id="windRiskLevel">--</div>
+                    <ul class="result-list" id="windRecommendationsList">
+                        <li>Enter wind speed to see limits.</li>
+                    </ul>
                 </div>
-            </div>
+            </section>
         </section>
 
-        <!-- 📰 NEWS TAB -->
+        <!-- NEWS TAB -->
         <section id="NewsTab" class="tab-content">
             <div id="AnnouncementsContainer">
                 <div id="newsLoading" class="loading-spinner">
@@ -468,83 +580,69 @@
                 </div>
             </div>
         </section>
+
+        <!-- 🔍 Observation detail modal -->
+        <div id="observationDetailModal" class="modal">
+            <div class="modal-content">
+                <button class="close-btn" type="button" onclick="hideObservationDetailModal()">
+                    &times;
+                </button>
+                <h2>Observation Details</h2>
+                <div id="observationDetailBody"></div>
+            </div>
+        </div>
+
     </main>
 
-    <!-- Floating Add Observation Button -->
+    <!-- FLOATING BUTTONS -->
     <a
         id="addObservationButton"
-        href="https://docs.google.com/forms/d/e/1FAIpQLSfYED_4UfHcmWn0fQOjtR5s8A0-Bhr4dwpe-80GjKkLeTR_Lw/viewform?usp=header"
+        class="add-observation-btn"
+        href="#"
         target="_blank"
     >
         <i class="fas fa-plus"></i> Add New Observation
     </a>
 
-    <!-- Floating Emergency Button -->
-    <button id="emergencyQuickButton" onclick="showEmergencyContactsModal()" title="Emergency Contacts">
+    <button
+        id="emergencyQuickButton"
+        type="button"
+        title="Emergency Contacts"
+        onclick="showEmergencyContactsModal()"
+    >
         <i class="fas fa-ambulance"></i>
     </button>
 
-    <!-- Bottom Navigation (mobile-first, but also works on desktop) -->
+    <!-- NAV BAR -->
     <nav class="nav-bar" role="tablist">
-        <div
-            class="nav-button active"
-            data-color="var(--danger-color)"
-            onclick="openTab(event, 'HomeTab')"
-            role="tab"
-            aria-selected="true"
-        >
+        <button class="nav-button active" type="button" data-tab="HomeTab" aria-selected="true">
             <span class="nav-icon"><i class="fas fa-house"></i></span>
             <span>Home</span>
-        </div>
-        <div
-            class="nav-button"
-            data-color="var(--success-color)"
-            onclick="openTab(event, 'ObservationsTab')"
-            role="tab"
-        >
+        </button>
+        <button class="nav-button" type="button" data-tab="ObservationsTab">
             <span class="nav-icon"><i class="fas fa-chart-line"></i></span>
             <span>Observations</span>
-        </div>
-        <div
-            class="nav-button"
-            data-color="#6f42c1"
-            onclick="openTab(event, 'TasksTab')"
-            role="tab"
-        >
+        </button>
+        <button class="nav-button" type="button" data-tab="TasksTab">
             <span class="nav-icon"><i class="fas fa-list-check"></i></span>
             <span>Tasks</span>
-        </div>
-        <div
-            class="nav-button"
-            data-color="var(--jsa-color)"
-            onclick="openTab(event, 'JSATab')"
-            role="tab"
-        >
+        </button>
+        <button class="nav-button" type="button" data-tab="JSATab">
             <span class="nav-icon"><i class="fas fa-handshake"></i></span>
             <span>Library</span>
-        </div>
-        <div
-            class="nav-button"
-            data-color="var(--kpi-color)"
-            onclick="openTab(event, 'ToolsTab')"
-            role="tab"
-        >
+        </button>
+        <button class="nav-button" type="button" data-tab="ToolsTab">
             <span class="nav-icon"><i class="fas fa-calculator"></i></span>
             <span>Tools</span>
-        </div>
-        <div
-            class="nav-button"
-            data-color="#17a2b8"
-            onclick="openTab(event, 'NewsTab')"
-            role="tab"
-        >
+        </button>
+        <button class="nav-button" type="button" data-tab="NewsTab">
             <span class="nav-icon"><i class="fas fa-bullhorn"></i></span>
             <span>News</span>
-        </div>
+        </button>
     </nav>
 </div>
 
-<!-- JS: data first (your links, JSAs, TBT) then app logic -->
+<!-- SCRIPTS -->
 <script src="js/data.js"></script>
 <script src="js/app.js"></script>
 </body>
