@@ -1821,76 +1821,34 @@ function showObservationDetail(obs) {
       }">${obsClassValue}</span>`
     : '';
 
-  // Evidence section (Google Drive photos)
+    // Evidence section (Google Drive links only)
   const evidenceLinks = Array.isArray(obs.evidenceLinks) && obs.evidenceLinks.length
     ? obs.evidenceLinks
     : (obs.evidenceUrl ? [obs.evidenceUrl] : []);
 
-  // Transform Google Drive share links into direct image URLs where possible
-  const toImageUrl = (url) => {
-    if (!url) return '';
-    const trimmed = url.trim();
-    if (!/^https?:\/\//i.test(trimmed)) return '';
-    try {
-      const u = new URL(trimmed);
-      if (u.hostname.includes('drive.google.com')) {
-        // Patterns: /file/d/FILE_ID/..., or open?id=FILE_ID
-        let id = '';
-        const parts = u.pathname.split('/');
-        const fileIndex = parts.indexOf('d');
-        if (fileIndex !== -1 && parts.length > fileIndex + 1) {
-          id = parts[fileIndex + 1];
-        }
-        if (!id && u.searchParams.has('id')) {
-          id = u.searchParams.get('id');
-        }
-        if (id) {
-          return `https://drive.google.com/uc?export=view&id=${id}`;
-        }
-      }
-    } catch (e) {
-      // fall through
-    }
-    return trimmed;
-  };
-
   let evidenceSection = '';
   if (evidenceLinks.length) {
-    const firstUrl = (evidenceLinks[0] || '').trim();
-    const thumbsHtml = evidenceLinks
-      .map((url, idx) => {
-        const safeUrl = (url || '').trim();
-        const imgUrl = toImageUrl(safeUrl);
-        if (!imgUrl) return '';
-        return `
-          <figure class="obs-evidence-image-wrapper">
-            <img
-              src="${imgUrl}"
-              alt="Observation evidence photo ${idx + 1}"
-              class="obs-evidence-image"
-              loading="lazy"
-            />
-            <figcaption class="obs-evidence-caption">Photo ${idx + 1}</figcaption>
-          </figure>
-        `;
-      })
-      .filter(Boolean)
-      .join('');
+    const validLinks = evidenceLinks
+      .map(url => (url || '').trim())
+      .filter(url => /^https?:\/\//i.test(url));
 
-    if (firstUrl && thumbsHtml.trim()) {
+    if (validLinks.length) {
+      const linksInline = validLinks
+        .map((url, idx) => {
+          const label = `Evident ${idx + 1}`;
+          return `<a href="${url}" target="_blank" rel="noopener">${label}</a>`;
+        })
+        .join(' - ');
+
       evidenceSection = `
         <section class="obs-detail-section">
           <div class="obs-detail-section-title">Observation Evidence</div>
           <div class="obs-evidence-box">
-            <a href="${firstUrl}" target="_blank" rel="noopener" class="obs-evidence-link">
-              <i class="fas fa-external-link-alt"></i>
-              Open all evidence in Google Drive
-            </a>
-            <div class="obs-evidence-images-grid">
-              ${thumbsHtml}
-            </div>
+            <p class="obs-evidence-links-line">
+              ${linksInline}
+            </p>
             <p class="obs-evidence-hint">
-              If any image does not load, use the link above to open the file(s) directly in Google Drive.
+              Evidence is stored in Google Drive. Open the links above to view the photos or files.
             </p>
           </div>
         </section>
@@ -1899,14 +1857,7 @@ function showObservationDetail(obs) {
   }
 
   body.innerHTML = `
-    <div class="obs-detail-header-line">
-      <div class="obs-header-left">
-        ${obs.code ? `<span class="obs-header-pill code">Code: ${obs.code}</span>` : ''}
-      </div>
-      <div class="obs-header-right">
-        ${obs.raLevel ? `<span class="${raChipClass}">${obs.raLevel}</span>` : ''}
-        ${obs.status ? `<span class="${statusChipClass}">${obs.status}</span>` : ''}
-      </div>
+  </div>
     </div>
 
     <section class="obs-detail-section">
