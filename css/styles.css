@@ -1866,18 +1866,31 @@ body.dark-mode .obs-detail-label {
 .emergency-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.8rem;
+    font-size: 0.9rem;
+    line-height: 1.45;
 }
 
 .emergency-table th,
 .emergency-table td {
     border: 1px solid rgba(148, 163, 184, 0.6);
-    padding: 0.35rem 0.4rem;
+    padding: 0.4rem 0.5rem;
     text-align: left;
 }
 
 .emergency-table th {
     background: #f3f4f6;
+    font-weight: 700;
+}
+
+/* Make the “Name” column stand out a bit more */
+.emergency-table tbody td:first-child {
+    font-weight: 600;
+}
+
+/* Make phone numbers a bit bolder and easier to hit */
+.emergency-table a {
+    font-weight: 600;
+    letter-spacing: 0.02em;
 }
 
 /* =========================================
