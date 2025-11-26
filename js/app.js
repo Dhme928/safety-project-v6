@@ -1,1391 +1,2473 @@
-// =========================
-//  GLOBAL CONFIG (filled from data.js at runtime)
-// =========================
+// My Observations App - main logic
+// All browser code is wrapped so it’s safe if this file is linted in Node, etc.
+(function () {
+  if (typeof document === 'undefined') return;
 
-let TASKS_URL = "";
-let ADD_OBS_URL = "";
-let EOM_CSV_URL = "";
-let OBS_CSV_URL = "";
-let NEWS_CSV_URL = "";
-let FULL_SHEET_URL = "";
-let TBT_LIST = [];
-let JSA_LIST = [];
+  // -------------------- Small helpers --------------------
 
-function initConfigFromWindow() {
-  // Read everything that data.js put on window.*
-  TASKS_URL = window.TASKS_FORM_EMBED_URL || "";
-  ADD_OBS_URL = window.ADD_OBSERVATION_FORM_URL || "";
-  EOM_CSV_URL = window.EOM_SHEET_URL || "";
-  OBS_CSV_URL = window.OBSERVATIONS_SHEET_CSV_URL || "";
-  NEWS_CSV_URL = window.NEWS_SHEET_CSV_URL || "";
-  FULL_SHEET_URL = window.OBSERVATIONS_FULL_SHEET_URL || "";
-  TBT_LIST = window.tbtData || [];
-  JSA_LIST = window.jsaData || [];
-}
-
-// =========================
-//  STATE
-// =========================
-
-let leaderboardData = [];
-let observationsAll = [];
-let observationsLoaded = false;
-
-const obsFilters = {
-  range: "today",
-  risk: "",
-  status: "",
-  search: ""
-};
-
-const KPI_CONFIG = [
-  {
-    id: "kpi_trir",
-    category: "Lagging",
-    name: "Total Recordable Injury Rate (TRIR)",
-    formula: "rate_200k",
-    inputs: [
-      { name: "recordable", label: "Recordable Injuries" },
-      { name: "hours", label: "Work Hours" }
-    ],
-    targetStr: "≤ 0.50",
-    targetVal: 0.5,
-    targetType: "max",
-    source: "CSM & Safety Handbook – Injury Rates"
-  },
-  {
-    id: "kpi_ltir",
-    category: "Lagging",
-    name: "Lost Time Injury Rate (LTIR)",
-    formula: "rate_200k",
-    inputs: [
-      { name: "lti", label: "Lost Time Injuries" },
-      { name: "hours", label: "Work Hours" }
-    ],
-    targetStr: "0.00",
-    targetVal: 0,
-    targetType: "max",
-    source: "CSM & Safety Handbook – LTI"
-  },
-  {
-    id: "kpi_mva",
-    category: "Lagging",
-    name: "Motor Vehicle Accident Rate (per 1M km)",
-    formula: "rate_1m",
-    inputs: [
-      { name: "mva", label: "MVA Count" },
-      { name: "km", label: "Kilometers Driven" }
-    ],
-    targetStr: "0.00",
-    targetVal: 0,
-    targetType: "max",
-    source: "CSM Vol II – Transport Safety"
-  },
-  {
-    id: "kpi_wp",
-    category: "Leading",
-    name: "Work Permit Compliance %",
-    formula: "percentage",
-    inputs: [
-      { name: "pass", label: "Permits Passed Audit" },
-      { name: "total", label: "Total Permits Audited" }
-    ],
-    targetStr: "100%",
-    targetVal: 100,
-    targetType: "min",
-    source: "CSM Vol II – Work Permits"
+  function $(selector) {
+    return document.querySelector(selector);
   }
-];
 
-// =========================
-//  UTILITIES
-// =========================
+  function $all(selector) {
+    return Array.from(document.querySelectorAll(selector));
+  }
 
-function parseCsv(text) {
-  const lines = text.trim().split(/\r?\n/);
-  if (!lines.length) return [];
-  const headers = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g, ""));
-  return lines
-    .slice(1)
-    .filter(l => l.trim().length > 0)
-    .map(line => {
-      const cols = line.split(",");
-      const obj = {};
-      headers.forEach((h, i) => {
-        const v = (cols[i] || "").trim().replace(/^"|"$/g, "");
-        obj[h] = v;
-      });
-      return obj;
-    });
-}
+  function parseEvidenceLinks(cell) {
+    if (!cell) return [];
+    if (Array.isArray(cell)) return cell;
 
-function toNumber(val) {
-  const n = parseFloat(String(val).replace(/[^\d.-]/g, ""));
-  return isNaN(n) ? 0 : n;
-}
+    return cell
+      .split(/[\n;,]+/)
+      .map(part => part.trim())
+      .filter(part => part && /^https?:\/\//i.test(part));
+  }
 
-function parseObsDate(str) {
-  if (!str) return null;
-  let d = new Date(str);
-  if (!isNaN(d.getTime())) return d;
-  const parts = str.split(/[\/\-]/);
-  if (parts.length === 3) {
-    let [dStr, mStr, yStr] = parts;
-    if (yStr.length === 2) yStr = "20" + yStr;
-    const day = parseInt(dStr, 10);
-    const month = parseInt(mStr, 10) - 1;
-    const year = parseInt(yStr, 10);
-    d = new Date(year, month, day);
+  // Very small CSV parser that understands quotes and commas.
+  function parseCSV(text) {
+    const rows = [];
+    let current = [];
+    let value = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      const next = text[i + 1];
+
+      if (inQuotes) {
+        if (char === '"' && next === '"') {
+          value += '"';
+          i++;
+        } else if (char === '"') {
+          inQuotes = false;
+        } else {
+          value += char;
+        }
+      } else {
+        if (char === '"') {
+          inQuotes = true;
+        } else if (char === ',') {
+          current.push(value.trim());
+          value = '';
+        } else if (char === '\n') {
+          current.push(value.trim());
+          rows.push(current);
+          current = [];
+          value = '';
+        } else if (char !== '\r') {
+          value += char;
+        }
+      }
+    }
+    if (value.length || current.length) {
+      current.push(value.trim());
+      rows.push(current);
+    }
+    return rows.filter(r => r.length > 0);
+  }
+  // Small helper for safe HTML text in dynamically-built cards
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function findColumnIndex(headers, candidates) {
+    if (!headers) return -1;
+    const lower = headers.map(h => (h || '').toLowerCase().trim());
+    for (const c of candidates) {
+      const target = c.toLowerCase();
+      const idx = lower.findIndex(h => h === target);
+      if (idx !== -1) return idx;
+    }
+    for (const c of candidates) {
+      const target = c.toLowerCase();
+      const idx = lower.findIndex(h => h.includes(target));
+      if (idx !== -1) return idx;
+    }
+    return -1;
+  }
+
+  function parseSheetDate(value) {
+    if (!value) return null;
+    let d = new Date(value);
     if (!isNaN(d.getTime())) return d;
-  }
-  return null;
-}
 
-function isSameDay(d1, d2) {
-  return (
-    d1.getFullYear() === d2.getFullYear() &&
-    d1.getMonth() === d2.getMonth() &&
-    d1.getDate() === d2.getDate()
-  );
-}
-
-function startOfDay(d) {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
-
-function daysAgo(num) {
-  const d = new Date();
-  d.setDate(d.getDate() - num);
-  return startOfDay(d);
-}
-
-// =========================
-//  THEME
-// =========================
-
-function applySavedTheme() {
-  const saved = localStorage.getItem("theme");
-  const body = document.body;
-  const icon = document.getElementById("modeIcon");
-  if (saved === "dark") {
-    body.classList.add("dark-mode");
-    if (icon) {
-      icon.classList.remove("fa-moon");
-      icon.classList.add("fa-sun");
+    const parts = value.split(/[\/\-]/).map(p => p.trim());
+    if (parts.length === 3) {
+      let [a, b, c] = parts;
+      if (c.length === 4) {
+        const day = parseInt(a, 10);
+        const month = parseInt(b, 10) - 1;
+        const year = parseInt(c, 10);
+        d = new Date(year, month, day);
+        if (!isNaN(d.getTime())) return d;
+      }
     }
-  } else {
-    body.classList.remove("dark-mode");
-    if (icon) {
-      icon.classList.remove("fa-sun");
-      icon.classList.add("fa-moon");
+    return null;
+  }
+
+  function startOfDay(d) {
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+
+  function isSameDay(a, b) {
+    return (
+      a && b &&
+      a.getFullYear() === b.getFullYear() &&
+      a.getMonth() === b.getMonth() &&
+      a.getDate() === b.getDate()
+    );
+  }
+
+  function isSameMonth(a, b) {
+    return (
+      a && b &&
+      a.getFullYear() === b.getFullYear() &&
+      a.getMonth() === b.getMonth()
+    );
+  }
+
+  function daysBetween(a, b) {
+    const ms = startOfDay(a) - startOfDay(b);
+    return Math.round(ms / (1000 * 60 * 60 * 24));
+  }
+
+  // -------------------- Global state --------------------
+
+  const state = {
+    darkMode: false,
+    observations: [],
+    observationsLoaded: false,
+    lastHeatSummary: null,
+    lastWindSummary: null
+  };
+
+  const obsFilterState = {
+    range: 'today',
+    risk: '',
+    status: '',
+    search: ''
+  };
+
+  // -------------------- Tab navigation --------------------
+
+  // track whether observations have been loaded at least once
+  let observationsInitialized = false;
+
+  function openTab(evt, tabId) {
+    // hide all tab contents
+    $all('.tab-content').forEach(sec => {
+      sec.classList.remove('active');
+      sec.style.display = 'none';
+    });
+
+    // show the selected tab
+    const target = $('#' + tabId);
+    if (target) {
+      target.classList.add('active');
+      target.style.display = 'block';
+    }
+
+    // update active state on bottom nav buttons
+    const navButtons = $all('.nav-button');
+    navButtons.forEach(btn => btn.classList.remove('active'));
+
+    if (evt && evt.currentTarget) {
+      evt.currentTarget.classList.add('active');
+    } else {
+      const match = navButtons.find(btn => btn.dataset.tab === tabId);
+      if (match) match.classList.add('active');
+    }
+
+    // lazy-load heavy iframe (Tasks form)
+    if (tabId === 'TasksTab') {
+      initTasksIframe();
+    }
+
+    // 🔥 lazy-load observations ONLY when Observations tab is opened
+    if (tabId === 'ObservationsTab' && !observationsInitialized) {
+      observationsInitialized = true;
+      loadObservations();
     }
   }
-}
 
-function toggleDarkMode() {
-  const body = document.body;
-  const icon = document.getElementById('modeIcon');
+  // keep this so HTML can still call openTab if needed
+  window.openTab = openTab;
 
-  const isCurrentlyLight = body.classList.contains('light-mode');
 
-  if (isCurrentlyLight) {
-    // Switch to DARK
-    body.classList.remove('light-mode');
-    body.classList.add('dark-mode');
+  // expose for inline onclick (just in case)
+  window.openTab = openTab;
 
-    icon.classList.remove('fa-moon');
-    icon.classList.add('fa-sun');
-  } else {
-    // Switch to LIGHT
-    body.classList.remove('dark-mode');
-    body.classList.add('light-mode');
-
-    icon.classList.add('fa-moon');
-    icon.classList.remove('fa-sun');
+  function setupNav() {
+    $all('.nav-button').forEach(btn => {
+      const tabId = btn.dataset.tab;
+      if (!tabId) return;
+      btn.addEventListener('click', e => openTab(e, tabId));
+    });
+    // default
+    openTab(null, 'HomeTab');
   }
-}
 
-// =========================
-//  NAV / TABS
-// =========================
+  // -------------------- Accordions --------------------
 
-function openTab(evt, tabName) {
-  const tabs = document.querySelectorAll(".tab-content");
-  tabs.forEach(t => t.classList.remove("active"));
-  const target = document.getElementById(tabName);
-  if (target) target.classList.add("active");
+function setupAccordions() {
+  const accordions = $all('.accordion');
 
-  const navButtons = document.querySelectorAll(".nav-button");
-  navButtons.forEach(btn => {
-    btn.classList.remove("active");
-    btn.setAttribute("aria-selected", "false");
+  accordions.forEach(btn => {
+    // 🔹 Skip rows that are used as modal triggers (no expand/collapse)
+    if (btn.classList.contains('accordion-modal')) return;
+
+    btn.addEventListener('click', () => {
+      const panel = btn.nextElementSibling;
+      if (!panel) return;
+
+      const isOpen = panel.style.display === 'block';
+
+      // close all
+      accordions.forEach(otherBtn => {
+        if (otherBtn.classList.contains('accordion-modal')) return;
+        const otherPanel = otherBtn.nextElementSibling;
+        if (!otherPanel) return;
+        otherBtn.classList.remove('active');
+        otherPanel.style.display = 'none';
+      });
+
+      // toggle clicked
+      if (!isOpen) {
+        btn.classList.add('active');
+        panel.style.display = 'block';
+      }
+    });
   });
-
-  if (evt && evt.currentTarget) {
-    const btn = evt.currentTarget;
-    btn.classList.add("active");
-    btn.setAttribute("aria-selected", "true");
-  }
-
-  const contentArea = document.querySelector(".content-area");
-  if (contentArea) contentArea.scrollTop = 0;
 }
 
-// =========================
-//  ACCORDIONS
-// =========================
 
-function initAccordions() {
-  const accordions = document.querySelectorAll(".accordion");
-  accordions.forEach(acc => {
-    acc.addEventListener("click", function () {
-      this.classList.toggle("activeAcc");
-      const panel = this.nextElementSibling;
-      if (!panel || !panel.classList.contains("panel")) return;
-      const isOpen = panel.style.display === "block";
-      // Close all others in same section
-      accordions.forEach(other => {
-        if (other !== this) {
-          other.classList.remove("activeAcc");
-          const p = other.nextElementSibling;
-          if (p && p.classList.contains("panel")) {
-            p.style.display = "none";
-          }
+
+  // -------------------- Modals --------------------
+
+  function showLeaderboardModal() {
+    const modal = $('#leaderboardModal');
+    if (modal) modal.classList.add('show');
+  }
+
+  function hideLeaderboardModal() {
+    const modal = $('#leaderboardModal');
+    if (modal) modal.classList.remove('show');
+  }
+
+  function showEmergencyContactsModal() {
+    const modal = $('#emergencyContactsModal');
+    if (modal) modal.classList.add('show');
+  }
+
+  function hideEmergencyContactsModal() {
+    const modal = $('#emergencyContactsModal');
+    if (modal) modal.classList.remove('show');
+  }
+
+  window.showLeaderboardModal = showLeaderboardModal;
+  window.hideLeaderboardModal = hideLeaderboardModal;
+  window.showEmergencyContactsModal = showEmergencyContactsModal;
+  window.hideEmergencyContactsModal = hideEmergencyContactsModal;
+
+  function setupModals() {
+    $all('.modal').forEach(modal => {
+      modal.addEventListener('click', e => {
+        if (e.target === modal) {
+          modal.classList.remove('show');
         }
       });
-      panel.style.display = isOpen ? "none" : "block";
     });
-  });
-}
-
-// =========================
-//  MODALS
-// =========================
-
-function showLeaderboardModal() {
-  const modal = document.getElementById("leaderboardModal");
-  if (modal) {
-    modal.style.display = "block";
-    renderLeaderboardTable();
-  }
-}
-
-function hideLeaderboardModal() {
-  const modal = document.getElementById("leaderboardModal");
-  if (modal) modal.style.display = "none";
-}
-
-function showEmergencyContactsModal() {
-  const modal = document.getElementById("emergencyContactsModal");
-  if (modal) modal.style.display = "block";
-}
-
-function hideEmergencyContactsModal() {
-  const modal = document.getElementById("emergencyContactsModal");
-  if (modal) modal.style.display = "none";
-}
-
-// =========================
-//  MONTH COLOR
-// =========================
-
-function setMonthColor() {
-  const el = document.getElementById("colorName");
-  if (!el) return;
-  const month = new Date().getMonth();
-  const colors = [
-    "Red",
-    "Yellow",
-    "Green",
-    "Blue",
-    "Orange",
-    "Purple",
-    "Brown",
-    "Pink",
-    "Grey",
-    "Black",
-    "White"
-  ];
-  el.textContent = colors[month] || "N/A";
-}
-
-// =========================
-//  EOM + LEADERBOARD
-// =========================
-
-function loadEomAndLeaderboard() {
-  const eomEl = document.getElementById("employeeOfMonth");
-
-  if (!EOM_CSV_URL || !EOM_CSV_URL.startsWith("http")) {
-    if (eomEl) eomEl.textContent = "Configure EOM_SHEET_URL in js/data.js";
-    leaderboardData = [];
-    renderHomeLeaderboardMini();
-    return;
   }
 
-  fetch(EOM_CSV_URL)
-    .then(res => res.text())
-    .then(text => {
-      const rows = parseCsv(text);
-      if (!rows.length) {
-        if (eomEl) eomEl.textContent = "No data";
-        leaderboardData = [];
-        renderHomeLeaderboardMini();
-        return;
+  // -------------------- Dark / light mode --------------------
+
+  function applyDarkMode(dark) {
+    const body = document.body;
+    const modeIcon = $('#modeIcon');
+    state.darkMode = dark;
+    if (dark) {
+      body.classList.add('dark-mode');
+      if (modeIcon) modeIcon.className = 'fas fa-sun';
+    } else {
+      body.classList.remove('dark-mode');
+      if (modeIcon) modeIcon.className = 'fas fa-moon';
+    }
+    try {
+      localStorage.setItem('safetyAppDarkMode', dark ? '1' : '0');
+    } catch (_) {}
+  }
+
+  function toggleDarkMode() {
+    applyDarkMode(!state.darkMode);
+  }
+
+  window.toggleDarkMode = toggleDarkMode;
+
+  function setupDarkMode() {
+    let stored = null;
+    try {
+      stored = localStorage.getItem('safetyAppDarkMode');
+    } catch (_) {}
+    if (stored === '1') {
+      applyDarkMode(true);
+    } else {
+      applyDarkMode(false);
+    }
+    const toggle = $('.mode-toggle');
+    if (toggle) {
+      toggle.addEventListener('click', toggleDarkMode);
+    }
+  }
+
+  // -------------------- GPS helper --------------------
+
+  function getGPSLocation() {
+    const resultEl = $('#locationResult');
+    if (!navigator.geolocation) {
+      if (resultEl) {
+        resultEl.textContent = 'Geolocation not supported on this device.';
       }
-      const latest = rows[rows.length - 1];
-      const name =
-        latest.Name ||
-        latest.Employee ||
-        latest["Employee Name"] ||
-        Object.values(latest)[0] ||
-        "Unknown";
-      if (eomEl) eomEl.textContent = name;
+      return;
+    }
 
-      leaderboardData = rows
-        .map(row => {
-          const n =
-            row.Name ||
-            row.Employee ||
-            row["Employee Name"] ||
-            "";
-          const points = toNumber(
-            row.Points || row.Score || row["Total Points"] || 0
-          );
-          return n ? { name: n, points } : null;
-        })
-        .filter(Boolean)
-        .sort((a, b) => b.points - a.points);
+    if (resultEl) {
+      resultEl.textContent = 'Getting location...';
+    }
 
-      renderHomeLeaderboardMini();
-    })
-    .catch(err => {
-      console.error("EOM load error:", err);
-      if (eomEl) eomEl.textContent = "Error loading data";
-      leaderboardData = [];
-      renderHomeLeaderboardMini();
-    });
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const { latitude, longitude } = pos.coords;
+        const link = `https://maps.google.com/?q=${latitude},${longitude}`;
+        if (resultEl) {
+          resultEl.innerHTML = `
+            <strong>Location:</strong> ${latitude.toFixed(5)}, ${longitude.toFixed(5)}
+            <br><a href="${link}" target="_blank">Open in Google Maps</a>
+          `;
+        }
+      },
+      err => {
+        if (resultEl) {
+          resultEl.textContent = 'Unable to get location: ' + err.message;
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
+  window.getGPSLocation = getGPSLocation;
+function getRotatingColorForCurrentMonth() {
+  try {
+    const m = new Date().getMonth(); // 0 = Jan ... 11 = Dec
+    const map = {
+      0: 'Yellow', // Jan
+      1: 'Red',    // Feb
+      2: 'Blue',   // Mar
+      3: 'Green',  // Apr
+      4: 'Yellow', // May
+      5: 'Red',    // Jun
+      6: 'Blue',   // Jul
+      7: 'Green',  // Aug
+      8: 'Yellow', // Sep
+      9: 'Red',    // Oct
+      10: 'Blue',  // Nov
+      11: 'Green'  // Dec
+    };
+    return map[m] || window.DEFAULT_MONTH_COLOR_NAME || 'White';
+  } catch (e) {
+    return window.DEFAULT_MONTH_COLOR_NAME || 'White';
+  }
+}
+function applyMonthColorBadge(el, name) {
+  const label = (name || '').trim() || 'N/A';
+
+  el.textContent = label;
+  el.classList.add('month-color-badge');
+  el.classList.remove('color-red', 'color-blue', 'color-green', 'color-yellow');
+
+  const lower = label.toLowerCase();
+  if (lower.includes('red')) el.classList.add('color-red');
+  else if (lower.includes('blue')) el.classList.add('color-blue');
+  else if (lower.includes('green')) el.classList.add('color-green');
+  else if (lower.includes('yellow')) el.classList.add('color-yellow');
 }
 
-function renderHomeLeaderboardMini() {
-  const container = document.getElementById("homeLeaderboardMini");
-  if (!container) return;
+  // -------------------- EOM + Leaderboard --------------------
 
-  if (!leaderboardData.length) {
-    container.innerHTML =
-      '<div style="font-size:12px; color:var(--text-muted);">No leaderboard data.</div>';
+async function loadEomAndLeaderboard() {
+  const url = window.EOM_SHEET_URL;
+  const eomNameEl = $('#employeeOfMonth');
+  const colorNameEl = $('#colorName');
+  const leaderboardMini = $('#homeLeaderboardMini');
+  const leaderboardContainer = $('#leaderboardContainer');
+
+  if (!url) {
+    if (eomNameEl) eomNameEl.textContent = 'Configure EOM_SHEET_URL in js/data.js';
+    if (colorNameEl) {
+      const fallback = getRotatingColorForCurrentMonth();
+      applyMonthColorBadge(colorNameEl, fallback);
+    }
+    if (leaderboardMini) leaderboardMini.textContent = 'No leaderboard data.';
+    if (leaderboardContainer) leaderboardContainer.textContent = 'No leaderboard data.';
     return;
   }
 
-  const top3 = leaderboardData.slice(0, 3);
-  const rows = top3
-    .map((p, idx) => {
-      const medal = idx === 0 ? "🥇" : idx === 1 ? "🥈" : "🥉";
-      return `
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-          <div style="display:flex; align-items:center; gap:6px;">
-            <span>${medal}</span>
-            <span style="font-size:13px; font-weight:600;">${p.name}</span>
-          </div>
-          <div style="font-size:13px; font-weight:600; color:var(--primary-color);">${p.points}</div>
-        </div>
-      `;
-    })
-    .join("");
-  container.innerHTML = rows;
-}
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    const rows = parseCSV(text);
+    if (!rows.length) throw new Error('Empty sheet');
 
-function renderLeaderboardTable() {
-  const container = document.getElementById("leaderboardContainer");
-  if (!container) return;
+    const headers = rows[0];
+    const body = rows.slice(1).filter(r => r.some(c => c && c.trim() !== ''));
 
-  if (!leaderboardData.length) {
-    container.innerHTML =
-      '<div class="loading-spinner"><i class="fas fa-info-circle"></i>&nbsp;No leaderboard data.</div>';
-    return;
-  }
+    if (!body.length) throw new Error('No data rows');
 
-  const rows = leaderboardData
-    .map((p, idx) => {
-      const medal =
-        idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : idx + 1;
-      return `
-        <tr>
-          <td style="text-align:center;">${medal}</td>
-          <td>${p.name}</td>
-          <td style="text-align:center;">${p.points}</td>
-        </tr>
-      `;
-    })
-    .join("");
+    const idxMonth = findColumnIndex(headers, ['Month', 'Period']);
+    const idxColor = findColumnIndex(headers, ['Color', 'Color Code']);
+    const idxEomName = findColumnIndex(headers, ['Employee', 'Employee of Month', 'Name']);
+    const idxPoints = findColumnIndex(headers, ['Points', 'Score']);
 
-  container.innerHTML = `
-    <table id="leaderboardTable">
-      <thead>
-        <tr>
-          <th style="width:60px;">Rank</th>
-          <th>Name</th>
-          <th style="width:80px;">Points</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${rows}
-      </tbody>
-    </table>
-  `;
-}
+    const current = body[0];
 
-// =========================
-//  TBT OF THE DAY + LIBRARY
-// =========================
+    const eomName = idxEomName !== -1 ? current[idxEomName] : '';
+    const colorFromSheet = idxColor !== -1 ? current[idxColor] : '';
+    const fallbackColor = getRotatingColorForCurrentMonth();
+    const finalColorName = (colorFromSheet && colorFromSheet.trim()) || fallbackColor;
 
-function getTodayTbt() {
-  if (!TBT_LIST.length) return null;
-  const today = new Date();
-  const index =
-    (today.getFullYear() * 366 +
-      today.getMonth() * 31 +
-      today.getDate()) %
-    TBT_LIST.length;
-  return TBT_LIST[index];
-}
+    if (eomNameEl) eomNameEl.textContent = eomName || 'Not set';
+    if (colorNameEl) {
+      applyMonthColorBadge(colorNameEl, finalColorName);
+    }
 
-function renderTbtOfTheDay() {
-  const homeEl = document.getElementById("homeTbtContent");
-  const panelEl = document.getElementById("tbtPanel");
-  const tbt = getTodayTbt();
+    const leaderboardItems = body.slice(0, 50).map(row => ({
+      name: idxEomName !== -1 ? row[idxEomName] : row[0],
+      points: idxPoints !== -1 ? row[idxPoints] : ''
+    })).filter(p => p.name);
 
-  if (!tbt) {
-    if (homeEl)
-      homeEl.textContent = "No TBT data configured. Add items in js/data.js.";
-    if (panelEl)
-      panelEl.innerHTML =
-        "<p>No TBT data configured. Add items in <code>tbtData</code> in js/data.js.</p>";
-    return;
-  }
+    // ---------- Top 3 mini card with medals ----------
+    if (leaderboardMini) {
+      if (!leaderboardItems.length) {
+        leaderboardMini.textContent = 'No leaderboard data.';
+      } else {
+        leaderboardMini.innerHTML = leaderboardItems
+          .slice(0, 3)
+          .map((p, i) => {
+            const medalClass =
+              i === 0 ? 'medal-gold' :
+              i === 1 ? 'medal-silver' :
+              i === 2 ? 'medal-bronze' : '';
 
-  if (homeEl) {
-    homeEl.innerHTML = `
-      <div style="font-size:14px; font-weight:600; margin-bottom:4px;">${tbt.title}</div>
-      <a href="${tbt.link}" target="_blank">Open TBT document</a>
-    `;
-  }
-  if (panelEl) {
-    panelEl.innerHTML = `
-      <p><strong>Today's Toolbox Talk:</strong> ${tbt.title}</p>
-      <p><a href="${tbt.link}" target="_blank">📎 Open Toolbox Talk document (Google Drive)</a></p>
-      <p style="font-size:12px; color:var(--text-muted); margin-top:8px;">
-        This topic is automatically selected from your TBT library based on today's date.
-      </p>
-    `;
-  }
-}
-
-function renderTbtLibrary() {
-  const container = document.getElementById("tbtLibraryList");
-  if (!container) return;
-
-  if (!TBT_LIST.length) {
-    container.innerHTML =
-      '<div class="obs-empty-state"><p>No TBT items found.</p></div>';
-    return;
-  }
-
-  const html = TBT_LIST.map(
-    tbt => `
-    <div class="jsa-accordion-item" onclick="window.open('${tbt.link}', '_blank')">
-      <i class="fas fa-book-open"></i> ${tbt.title}
-    </div>
-  `
-  ).join("");
-
-  container.innerHTML = html;
-}
-
-// =========================
-//  JSA LIBRARY
-// =========================
-
-function renderJSAList(filterText = "") {
-  const container = document.getElementById("jsaListContainer");
-  if (!container) return;
-
-  const q = filterText.trim().toLowerCase();
-  const items = JSA_LIST.filter(j => j.title.toLowerCase().includes(q));
-
-  if (!items.length) {
-    container.innerHTML =
-      '<div class="obs-empty-state"><p>No JSA found for this search.</p></div>';
-    return;
-  }
-
-  let html = "";
-  items.forEach((jsa, idx) => {
-    const panelId = `jsa-panel-${idx}`;
-    html += `
-      <div>
-        <button class="jsa-accordion-item" data-panel-id="${panelId}">
-          <i class="fas fa-file-alt"></i> ${jsa.title}
-        </button>
-        <div class="jsa-panel" id="${panelId}">
-          <p style="margin-top:0;">JSA for: <strong>${jsa.title}</strong></p>
-          <p style="font-size:13px; color:var(--text-muted);">
-            Click the button below to open the JSA document in Google Drive.
-          </p>
-          <button class="gps-btn" onclick="window.open('${jsa.link}', '_blank')">
-            ✅ Open JSA in Google Drive
-          </button>
-        </div>
-      </div>
-    `;
-  });
-
-  container.innerHTML = html;
-
-  // Accordion behavior for JSA items
-  const jsaAccs = container.querySelectorAll(".jsa-accordion-item");
-  jsaAccs.forEach(btn => {
-    btn.addEventListener("click", function () {
-      const panelId = this.getAttribute("data-panel-id");
-      const panel = document.getElementById(panelId);
-      if (!panel) return;
-      const isOpen = panel.style.display === "block";
-
-      jsaAccs.forEach(other => {
-        const pid = other.getAttribute("data-panel-id");
-        const p = document.getElementById(pid);
-        if (p) p.style.display = "none";
-        other.classList.remove("activeAcc");
-      });
-
-      if (!isOpen) {
-        panel.style.display = "block";
-        this.classList.add("activeAcc");
+            return `
+              <div class="leaderboard-mini-item">
+                <div class="leaderboard-mini-left">
+                  <span class="leaderboard-medal ${medalClass}">
+                    <i class="fas fa-medal"></i>
+                  </span>
+                  <div class="leaderboard-mini-text">
+                    <div class="leaderboard-name">${p.name}</div>
+                    ${p.points ? `<div class="leaderboard-points">${p.points} pts</div>` : ''}
+                  </div>
+                </div>
+              </div>
+            `;
+          })
+          .join('');
       }
-    });
-  });
-}
-
-function filterJSAList() {
-  const input = document.getElementById("jsaSearch");
-  const q = input ? input.value : "";
-  renderJSAList(q);
-}
-
-// =========================
-//  KPI CALCULATIONS
-// =========================
-
-function calculateKpiValue(config, values) {
-  switch (config.formula) {
-    case "rate_200k": {
-      const num = toNumber(values[config.inputs[0].name]);
-      const hours = toNumber(values.hours || values[config.inputs[1].name]);
-      if (!hours) return null;
-      return (num * 200000) / hours;
     }
-    case "rate_1m": {
-      const num = toNumber(values[config.inputs[0].name]);
-      const km = toNumber(values.km || values[config.inputs[1].name]);
-      if (!km) return null;
-      return (num * 1000000) / km;
+
+    // ---------- Full leaderboard in modal ----------
+    if (leaderboardContainer) {
+      if (!leaderboardItems.length) {
+        leaderboardContainer.textContent = 'No leaderboard data.';
+      } else {
+        leaderboardContainer.innerHTML = leaderboardItems
+          .map((p, i) => `
+            <div class="leaderboard-row">
+              <span class="leaderboard-rank">#${i + 1}</span>
+              <span class="leaderboard-row-name">${p.name}</span>
+              ${p.points ? `<span class="leaderboard-row-points">${p.points} pts</span>` : ''}
+            </div>
+          `)
+          .join('');
+      }
     }
-    case "percentage": {
-      const pass = toNumber(values[config.inputs[0].name]);
-      const total = toNumber(values[config.inputs[1].name]);
-      if (!total) return null;
-      return (pass / total) * 100;
+  } catch (err) {
+    console.error('EOM/Leaderboard error:', err);
+    if (eomNameEl) eomNameEl.textContent = 'Error loading data';
+    if (colorNameEl) {
+      const fallback = getRotatingColorForCurrentMonth();
+      applyMonthColorBadge(colorNameEl, fallback);
     }
-    default:
-      return null;
+    if (leaderboardMini) leaderboardMini.textContent = 'Error loading leaderboard.';
+    if (leaderboardContainer) leaderboardContainer.textContent = 'Error loading leaderboard.';
   }
 }
 
-function formatKpiValue(config, value) {
-  if (value === null) return "--";
-  if (config.formula === "percentage") return value.toFixed(1) + "%";
-  if (config.id === "kpi_mva") return value.toFixed(2);
-  return value.toFixed(2);
-}
+  // -------------------- TBT of the day + TBT/JSA libraries --------------------
 
-function evaluateKpiTarget(config, value) {
-  if (value === null) return "unknown";
-  if (config.targetType === "max") {
-    return value <= config.targetVal ? "ok" : "bad";
+  function pickTbtOfDay(list) {
+    if (!list || !list.length) return null;
+    const today = new Date();
+    const start = new Date(today.getFullYear(), 0, 0);
+    const diff = today - start;
+    const oneDay = 1000 * 60 * 60 * 24;
+    const dayOfYear = Math.floor(diff / oneDay);
+    const index = dayOfYear % list.length;
+    return list[index];
   }
-  if (config.targetType === "min") {
-    return value >= config.targetVal ? "ok" : "bad";
+
+  function setupTbtOfDay() {
+    const list = Array.isArray(window.tbtData) ? window.tbtData : [];
+    const tbtSection = $('#homeTbtSection');
+    const tbtContent = $('#homeTbtContent');
+    const tbtPanel = $('#tbtPanel');
+
+    if (!list.length) {
+      if (tbtContent) tbtContent.textContent = 'No TBT data configured. Add items in js/data.js.';
+      if (tbtPanel) tbtPanel.textContent = 'No TBT data configured.';
+      return;
+    }
+
+    const todayTbt = pickTbtOfDay(list);
+    if (tbtContent && todayTbt) {
+      tbtContent.innerHTML = `
+        <div class="tbt-title">${todayTbt.title}</div>
+        <a href="${todayTbt.link}" class="tbt-link" target="_blank">Open TBT document</a>
+      `;
+    }
+
+    if (tbtPanel) {
+      tbtPanel.innerHTML = list.map(item => `
+        <div class="tbt-item">
+          <i class="fas fa-book-open"></i>
+          <a href="${item.link}" target="_blank">${item.title}</a>
+        </div>
+      `).join('');
+    }
   }
-  return "unknown";
-}
 
-function renderKPIs() {
-  const container = document.getElementById("kpiListContainer");
-  if (!container) return;
+  
+// =========================================
+// CSM LIBRARY
+// =========================================
+// Initialize if not defined; items are { title: string, link: string }
+window.csmData = window.csmData || [];
 
-  const cards = KPI_CONFIG.map(cfg => {
-    const inputsHtml = cfg.inputs
-      .map(
-        inp => `
-      <div class="kpi-input-group">
-        <label>${inp.label}</label>
-        <input
-          type="number"
-          step="any"
-          class="kpi-input-field"
-          data-kpi="${cfg.id}"
-          data-field="${inp.name}"
-          placeholder="0"
-        >
-      </div>
-    `
-      )
-      .join("");
+window.csmData = [
+  { title: "CSM - index - الفهرس", link: "https://drive.google.com/file/d/1EUTfno4FZtL0uyrCr28KY5vAR--h8QuZ/view?usp=drivesdk" },
+  { title: "CSM - Contractor Safety Administrative Requirements", link: "https://drive.google.com/file/d/14P2Yjmp2w54R2m1yOAOVKjv1auRpMmND/view?usp=drive_link" },
+  { title: "CSM I-1 Emergency Reporting and Response", link: "https://drive.google.com/file/d/1z8karx9RyNKORpVE7UJkDwVus4vz2UPf/view?usp=drive_link" },
+  { title: "CSM I-2 Incident Reporting and Investigation", link: "https://drive.google.com/file/d/1KwbXosNd5DwpLZ8MYWb8UUuEdWeh7NfX/view?usp=drive_link" },
+  { title: "CSM I-3 Personal Protective Equipment (PPE)", link: "https://drive.google.com/file/d/152cfH1EqdIrk5_V9pcwzj8djl3O6-yJJ/view?usp=drive_link" },
+  { title: "CSM I-4 Work Permit System and Stop Work Authority", link: "https://drive.google.com/file/d/1Qz8e2vnXC58XxUKJxSaqG2s-jza3sSz3/view?usp=drive_link" },
+  { title: "CSM 1-5 Isolation, Lockout and Use of Hold Tags", link: "https://drive.google.com/file/d/1J_klce7pdbNA3cvaiP7QIOZJJFEDazlx/view?usp=drive_link" },
+  { title: "CSM I-6 Confined Spaces", link: "https://drive.google.com/file/d/1ggwNBBuMJRpXAggc_pGCRHJP3jPhdB5Y/view?usp=drive_link" },
+  { title: "CSM I-7 Fire Prevention", link: "https://drive.google.com/file/d/1qlOm6lfqblv_gpH0EReezkEs6EYDoted/view?usp=drivesdk" },
+  { title: "CSM I-8 Traffic and Vehicle Safety ", link: "https://drive.google.com/file/d/1PQ7sg8sQntHro3Zgs49bopnsBjHz3hBy/view?usp=drivesdk" },
+  { title: "CSM I-9 Compressed Gas Cylinders", link: "https://drive.google.com/file/d/1nMbZr89lnGwXoQ4LysxRxri-LlFyWY9K/view?usp=drivesdk" }, 
+  { title: "CSM I-10 Hazardous Materials", link: "https://drive.google.com/file/d/1VvcaqQrzivHC5KLRUn3nfFAGlfUZMj0F/view?usp=drivesdk" },
+  { title: "CSM I-11 Hand Tools and Power Tools", link: "https://drive.google.com/file/d/1ZMS7gxHaKwPmDj3BXec6SYZ0Ljcy0Ggk/view?usp=drivesdk" },
+  { title: "CSM I-12 Materials Handling", link: "https://drive.google.com/file/d/1IpbgrGR0N5K4UBfszVkdtzX00jbZQ6oJ/view?usp=drivesdk" },
+  { title: "CSM I-13 Heat Stress", link: "https://drive.google.com/file/d/1OaA5D8-BYsBL7ZReq96BfJ3_nYbgLaNv/view?usp=drivesdk" }, 
+  { title: "CSM II-1 Excavations and Shoring", link: "https://drive.google.com/file/d/1imul0j3y9ONgLMSwWZ6aETE6xwvjK34L/view?usp=drivesdk" },
+  { title: "CSM II-2 Scaffolding", link: "https://drive.google.com/file/d/1sMWbIwgPp4BO7yNUF-LxrSz1WmNGNeUS/view?usp=drivesdk" },
+  { title: "CSM II-3 Ladders and Stepladders", link: "https://drive.google.com/file/d/1SLRwVCUUjJ6BYeDrMUsZnwHTgOt61ujl/view?usp=drivesdk" },
+  { title: "CSM II-4 Temporary Walking & Working Surfaces", link: "https://drive.google.com/file/d/1IGR51m-92KQ-I0R3zLVxXbeS2nfmcKWH/view?usp=drivesdk" }, 
+  { title: "CSM II-5 Fall Protection", link: "https://drive.google.com/file/d/1uQoZnTHT4VCJkm9SG3zVhW_2Rv-p8vp8/view?usp=drivesdk" },
+  { title: "CSM II-6 Concrete Construction ", link: "https://drive.google.com/file/d/1xdtwzdkP4CXWPWL5m9gmz0w4-pzoqrsM/view?usp=drivesdk" },
+  { title: "CSM II-7 Steel Erection", link: "https://drive.google.com/file/d/1X8dfslDfmJnYBztL7ZRaeWHz3qPBZ7gX/view?usp=drivesdk" },
+  { title: "CSM II-8 Abrasive Blasting", link: "https://drive.google.com/file/d/1qLMljOlgR_EFvnlyWPXmCTt0dCKG4pb6/view?usp=drivesdk" }, 
+  { title: "CSM II-9 Painting and Coating", link: "https://drive.google.com/file/d/1NMm17WJBC_7mcmX6GVtBIMToWIT_Hg9H/view?usp=drivesdk" },
+  { title: "CSM II-10 Cutting, Welding and Brazing ", link: "https://drive.google.com/file/d/1Qj4-Xl5k76FqyeXUT2XdedLbvL7WJ7Rm/view?usp=drivesdk" },
+  { title: "CSM II-11 Road works", link: "https://drive.google.com/file/d/1dbHE3rLRh195UzhfqToiWoqbBdmDAOUP/view?usp=drivesdk" },
+  { title: "CSM II-12 Piling Operations and Cofferdams", link: "https://drive.google.com/file/d/1gjSHH7CuLIif6cg8AwA0Cy8yzpD2Nu9I/view?usp=drivesdk" }, 
+  { title: "CSM II-13 Explosive Materials", link: "https://drive.google.com/file/d/14aSXwDr8GjK-1TBILalrIV53IXb1Z4lz/view?usp=drivesdk" },
+  { title: "CSM II-14 Demolition", link: "https://drive.google.com/file/d/1m0Pk7RfNxftN81DMHIfo2Fu7p8bJu6KP/view?usp=drivesdk" },
+  { title: "CSM II-15 Rope Access", link: "https://drive.google.com/file/d/1_C0l2UquZ4Nih_-WmWunQnXpDGAgrDKj/view?usp=drivesdk" },
+  { title: "CSM III-1 Machine Guarding ", link: "https://drive.google.com/file/d/1kg9gsGgA6MVs7M515vAe5CEkDRiGm3I4/view?usp=drivesdk" }, 
+  { title: "CSM III-2 Mechanical and Heavy Equipment", link: "https://drive.google.com/file/d/1W06lWO34CDskrHm5sfgGnbIuw6gBxnaY/view?usp=drivesdk" },
+  { title: "CSM III-3 Electrical Equipment", link: "https://drive.google.com/file/d/1d2_KTb8KaKc7nZh24ZB-5MdBtWOY1ooE/view?usp=drivesdk" },
+  { title: "CSM III-4 Pressure Testing", link: "https://drive.google.com/file/d/1MbAdlctVQuZK_WtaPjCPHY0M-BaBrh3r/view?usp=drivesdk" },
+  { title: "CSM III-5 Ionizing Radiation", link: "https://drive.google.com/file/d/1j7wdxEhmf3-fjcbwB30cYmSWLs6TOBe6/view?usp=drivesdk" }, 
+  { title: "CSM III-6 Non-Destructive Testing (NDT)", link: "https://drive.google.com/file/d/1bTf8WAI1ygyr9Cfvnwif33oEe1yWDE30/view?usp=drivesdk" },
+  { title: "CSM III-7 Cranes and Lifting Equipment ", link: "https://drive.google.com/file/d/1jIqqCzc631vyFkDfsi5UYacax6tMFbsm/view?usp=drivesdk" },
+  { title: "CSM III-8 Slings and Rigging Hardware", link: "https://drive.google.com/file/d/1WioaM8T9Do9KgzccJ0nXpUKkuWCfg9lR/view?usp=drivesdk" },
+  { title: "CSM III-9 High Pressure Water Jetting", link: "https://drive.google.com/file/d/1zfqzW7SF_OROG6BZr2eUWCIcFjH-1pGq/view?usp=drivesdk" }, 
+  { title: "CSM IV-1 Diving Operations", link: "https://drive.google.com/file/d/1duFN7U1Kv-i5_y9KPN2FiaVE-hStJHQM/view?usp=drivesdk" },
+  { title: "CSM IV-2 Marine Operations ", link: "https://drive.google.com/file/d/1H2R-d02dA1vuBeQSMm9yGHYssb5Kbbkb/view?usp=drivesdk" },
+  { title: "CSM IV-3 Drilling and Well Servicing", link: "https://drive.google.com/file/d/1pODZ0oZY5YzH8AURGBG7_ZKamjQIis-v/view?usp=drivesdk" },
+  { title: "CSM IV-4 Aviation", link: "https://drive.google.com/file/d/1ZyOCVN7E4Rmf1k4DvJ4YkbdEO95XKxtQ/view?usp=drivesdk" },
+  { title: "CSM X- Glossary of Terms", link: "https://drive.google.com/file/d/1LYNw-1mxakpk2a4-WGjKXM6w7nGMXm5K/view?usp=drivesdk" }, 
+  { title: "CSM - WSSM Table of Contents ", link: "https://drive.google.com/file/d/14-WcTxSJTqawcvN7D0nmh0McBmqoy1W4/view?usp=drivesdk" },
+  { title: "Full CSM Book", link: "https://drive.google.com/file/d/1JS1VQKXLHdOOFXpYcpRftM-kviBv-TYd/view?usp=drivesdk" }
+];
+// ---- Library cards (JSA & TBT) ----
+
+  // Build one expandable "news-style" card for a library document
+  function createLibraryDocCard(item, type) {
+    const safeTitle = escapeHtml(item.title || '');
+    const safeLink = item.link || '#';
+
+    const desc =
+      type === 'jsa'
+        ? 'Job Safety Analysis document for specific site activities.'
+        : 'Tool Box Talk document for daily or weekly safety briefings.';
 
     return `
-      <div class="kpi-card">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-          <div style="font-family:'Poppins',sans-serif; font-weight:600; font-size:14px;">${cfg.name}</div>
-          <span style="font-size:11px; padding:3px 7px; border-radius:999px; background-color:rgba(0,0,0,0.03); color:var(--text-muted);">
-            ${cfg.category}
-          </span>
+      <article class="announcement-card library-doc-card" data-link="${safeLink}">
+        <div class="card-title clickable">
+          <span>${safeTitle}</span>
+          <i class="fas fa-chevron-down toggle-icon"></i>
         </div>
-        ${inputsHtml}
-        <div class="kpi-footer">
-          <div class="kpi-result-box">
-            <div class="kpi-result-label">Result</div>
-            <div class="kpi-result-value" id="${cfg.id}_value">--</div>
-          </div>
-          <div class="kpi-result-box">
-            <div class="kpi-result-label">Target</div>
-            <div class="kpi-result-value">${cfg.targetStr}</div>
-          </div>
+        <div class="card-content">
+          <p style="margin-bottom:0.5rem;">${desc}</p>
+          <button type="button" class="library-open-btn">
+            Open "${safeTitle}"
+          </button>
         </div>
-        <div class="kpi-citation">
-          Source: ${cfg.source}
-        </div>
-      </div>
+      </article>
     `;
-  }).join("");
+  }
 
-  container.innerHTML = cards;
+  // Attach expand/collapse + Open button behaviour to cards inside a container
+  function wireLibraryCards(container) {
+    if (!container) return;
 
-  container.querySelectorAll("input[data-kpi]").forEach(input => {
-    input.addEventListener("input", () => {
-      const kpiId = input.getAttribute("data-kpi");
-      const cfg = KPI_CONFIG.find(k => k.id === kpiId);
-      if (!cfg) return;
+    const cards = Array.from(container.querySelectorAll('.library-doc-card'));
 
-      const values = {};
-      container
-        .querySelectorAll(`input[data-kpi="${kpiId}"]`)
-        .forEach(i => {
-          const field = i.getAttribute("data-field");
-          values[field] = i.value;
+    cards.forEach(card => {
+      const titleEl = card.querySelector('.card-title');
+      const contentEl = card.querySelector('.card-content');
+      const icon = card.querySelector('.toggle-icon');
+      const btn = card.querySelector('.library-open-btn');
+      const link = card.dataset.link;
+
+      if (contentEl) {
+        // start collapsed
+        contentEl.style.display = 'none';
+      }
+
+      if (titleEl && contentEl) {
+        titleEl.addEventListener('click', () => {
+          const isOpen = card.classList.contains('open');
+
+          // close all other cards first
+          cards.forEach(other => {
+            other.classList.remove('open');
+            const otherContent = other.querySelector('.card-content');
+            const otherIcon = other.querySelector('.toggle-icon');
+            if (otherContent) otherContent.style.display = 'none';
+            if (otherIcon) otherIcon.classList.remove('rotated');
+          });
+
+          if (!isOpen) {
+            card.classList.add('open');
+            contentEl.style.display = 'block';
+            if (icon) icon.classList.add('rotated');
+          }
+        });
+      }
+
+      if (btn && link) {
+        btn.addEventListener('click', ev => {
+          ev.stopPropagation();
+          window.open(link, '_blank');
+        });
+      }
+    });
+  }
+
+  // TBT library: search + cards
+function setupTbtLibrary() {
+  const list = Array.isArray(window.tbtData) ? window.tbtData : [];
+  const container = $('#tbtLibraryList');
+  const search = $('#tbtSearch');
+  if (!container) return;
+
+  function render(filter) {
+    const q = (filter || '').toLowerCase();
+    const filtered = list.filter(item =>
+      !q || (item.title && item.title.toLowerCase().includes(q))
+    );
+
+    if (!filtered.length) {
+      container.innerHTML = '<p class="text-muted">No TBT found for this search.</p>';
+      return;
+    }
+
+    container.innerHTML = filtered
+      .map(item => `
+        <div class="library-item-card">
+          <div class="library-item-header">
+            <div class="library-item-title">
+              <i class="fas fa-book-open"></i>
+              <span>${item.title}</span>
+            </div>
+            <i class="fas fa-chevron-down library-item-toggle"></i>
+          </div>
+          <div class="library-item-body">
+            <a href="${item.link}" target="_blank" class="library-item-open-button">
+              <i class="fas fa-external-link-alt"></i>
+              Open "${item.title}"
+            </a>
+          </div>
+        </div>
+      `)
+      .join('');
+
+    const cards = Array.from(container.querySelectorAll('.library-item-card'));
+
+    cards.forEach(card => {
+      const headerEl = card.querySelector('.library-item-header');
+      const bodyEl = card.querySelector('.library-item-body');
+      const toggleIcon = card.querySelector('.library-item-toggle');
+      if (!headerEl || !bodyEl) return;
+
+      // start collapsed
+      bodyEl.style.display = 'none';
+
+      headerEl.addEventListener('click', () => {
+        const isOpen = bodyEl.style.display === 'block';
+
+        // 🔒 close all cards first
+        cards.forEach(c => {
+          const b = c.querySelector('.library-item-body');
+          const i = c.querySelector('.library-item-toggle');
+          if (b) b.style.display = 'none';
+          if (i) i.classList.remove('rotated');
         });
 
-      const v = calculateKpiValue(cfg, values);
-      const valEl = document.getElementById(`${cfg.id}_value`);
-      if (!valEl) return;
-      valEl.textContent = formatKpiValue(cfg, v);
+        // then open the one that was clicked (if it was closed)
+        if (!isOpen) {
+          bodyEl.style.display = 'block';
+          if (toggleIcon) toggleIcon.classList.add('rotated');
+        }
+      });
+    });
+  }
 
-      const status = evaluateKpiTarget(cfg, v);
-      if (status === "ok") {
-        valEl.style.color = "var(--success-color)";
-      } else if (status === "bad") {
-        valEl.style.color = "var(--danger-color)";
-      } else {
-        valEl.style.color = "var(--text-color)";
-      }
+  if (!list.length) {
+    container.textContent = 'No TBT items found.';
+    return;
+  }
+
+  render('');
+
+  if (search) {
+    search.addEventListener('input', () => {
+      render(search.value);
+    });
+  }
+}
+  // JSA library: search + cards
+function setupJsaLibrary() {
+  const list = Array.isArray(window.jsaData) ? window.jsaData : [];
+  const container = $('#jsaListContainer');
+  const search = $('#jsaSearch');
+  if (!container) return;
+
+  function render(filter) {
+    const q = (filter || '').toLowerCase();
+    const filtered = list.filter(item =>
+      !q || (item.title && item.title.toLowerCase().includes(q))
+    );
+
+    if (!filtered.length) {
+      container.innerHTML = '<p class="text-muted">No JSA found for this search.</p>';
+      return;
+    }
+
+    container.innerHTML = filtered
+      .map(item => `
+        <div class="library-item-card">
+          <div class="library-item-header">
+            <div class="library-item-title">
+              <i class="fas fa-clipboard-list"></i>
+              <span>${item.title}</span>
+            </div>
+            <i class="fas fa-chevron-down library-item-toggle"></i>
+          </div>
+          <div class="library-item-body">
+            <a href="${item.link}" target="_blank" class="library-item-open-button">
+              <i class="fas fa-external-link-alt"></i>
+              Open "${item.title}"
+            </a>
+          </div>
+        </div>
+      `)
+      .join('');
+
+    const cards = Array.from(container.querySelectorAll('.library-item-card'));
+
+    cards.forEach(card => {
+      const headerEl = card.querySelector('.library-item-header');
+      const bodyEl = card.querySelector('.library-item-body');
+      const toggleIcon = card.querySelector('.library-item-toggle');
+      if (!headerEl || !bodyEl) return;
+
+      bodyEl.style.display = 'none';
+
+      headerEl.addEventListener('click', () => {
+        const isOpen = bodyEl.style.display === 'block';
+
+        // 🔒 close all JSA cards first
+        cards.forEach(c => {
+          const b = c.querySelector('.library-item-body');
+          const i = c.querySelector('.library-item-toggle');
+          if (b) b.style.display = 'none';
+          if (i) i.classList.remove('rotated');
+        });
+
+        if (!isOpen) {
+          bodyEl.style.display = 'block';
+          if (toggleIcon) toggleIcon.classList.add('rotated');
+        }
+      });
+    });
+  }
+
+  if (!list.length) {
+    container.textContent = 'No JSA found.';
+    return;
+  }
+
+  render('');
+
+  if (search) {
+    search.addEventListener('input', () => {
+      render(search.value);
+    });
+  }
+}
+
+// CSM library: search + cards
+function setupCsmLibrary() {
+  const list = Array.isArray(window.csmData) ? window.csmData : [];
+  const container = $('#csmLibraryList');
+  const search = $('#csmSearch');
+  if (!container) return;
+
+  function render(filter) {
+    const q = (filter || '').toLowerCase();
+    const filtered = list.filter(item =>
+      !q || (item.title && item.title.toLowerCase().includes(q))
+    );
+
+    if (!filtered.length) {
+      container.innerHTML = '<p class="text-muted">No CSM found for this search.</p>';
+      return;
+    }
+
+    container.innerHTML = filtered
+      .map(item => `
+        <div class="library-item-card">
+          <div class="library-item-header">
+            <div class="library-item-title">
+              <i class="fas fa-hard-hat"></i>
+              <span>${item.title}</span>
+            </div>
+            <i class="fas fa-chevron-down library-item-toggle"></i>
+          </div>
+          <div class="library-item-body">
+            <a href="${item.link}" target="_blank" class="library-item-open-button">
+              <i class="fas fa-external-link-alt"></i>
+              Open "${item.title}"
+            </a>
+          </div>
+        </div>
+      `)
+      .join('');
+
+    const cards = Array.from(container.querySelectorAll('.library-item-card'));
+
+    cards.forEach(card => {
+      const headerEl = card.querySelector('.library-item-header');
+      const bodyEl = card.querySelector('.library-item-body');
+      const toggleIcon = card.querySelector('.library-item-toggle');
+      if (!headerEl || !bodyEl) return;
+
+      bodyEl.style.display = 'none';
+
+      headerEl.addEventListener('click', () => {
+        const isOpen = bodyEl.style.display == 'block';
+
+        // close all CSM cards first
+        cards.forEach(c => {
+          const b = c.querySelector('.library-item-body');
+          const i = c.querySelector('.library-item-toggle');
+          if (b) b.style.display = 'none';
+          if (i) i.classList.remove('rotated');
+        });
+
+        if (!isOpen) {
+          bodyEl.style.display = 'block';
+          if (toggleIcon) toggleIcon.classList.add('rotated');
+        }
+      });
+    });
+  }
+
+  if (!list.length) {
+    container.textContent = 'No CSM items found.';
+    return;
+  }
+
+  render('');
+
+  if (search) {
+    search.addEventListener('input', () => {
+      render(search.value);
+    });
+  }
+}
+
+  // Switch between "menu" / JSA view / TBT view
+function setupLibrarySwitcher() {
+  const chooser = $('#libraryChooser');
+  const content = $('#libraryContent');
+  const backBtn = $('#libraryBackButton');
+  const titleEl = $('#libraryTitle');
+  const jsaSearchWrapper = $('#libraryJsaSearchWrapper');
+  const tbtSearchWrapper = $('#libraryTbtSearchWrapper');
+  const csmSearchWrapper = $('#libraryCsmSearchWrapper');
+  const tbtList = $('#tbtLibraryList');
+  const jsaList = $('#jsaListContainer');
+  const csmList = $('#csmLibraryList');
+
+  if (!chooser || !content || !backBtn || !titleEl || !tbtList || !jsaList) return;
+
+  function showChooser() {
+    chooser.style.display = 'flex';
+    content.style.display = 'none';
+
+    if (jsaSearchWrapper) jsaSearchWrapper.style.display = 'none';
+    if (tbtSearchWrapper) tbtSearchWrapper.style.display = 'none';
+    jsaList.style.display = 'none';
+    tbtList.style.display = 'none';
+  }
+
+  function openLibrary(type) {
+    chooser.style.display = 'none';
+    content.style.display = 'block';
+
+    if (type === 'jsa') {
+      titleEl.textContent = 'Job Safety Analysis Library';
+      if (jsaSearchWrapper) jsaSearchWrapper.style.display = 'block';
+      if (tbtSearchWrapper) tbtSearchWrapper.style.display = 'none';
+      jsaList.style.display = 'block';
+      tbtList.style.display = 'none';
+    } else if (type === 'tbt') {
+      titleEl.textContent = 'Tool Box Talk Library';
+      if (jsaSearchWrapper) jsaSearchWrapper.style.display = 'none';
+      if (tbtSearchWrapper) tbtSearchWrapper.style.display = 'block';
+      if (csmSearchWrapper) csmSearchWrapper.style.display = 'none';
+      jsaList.style.display = 'none';
+      tbtList.style.display = 'block';
+      if (csmList) csmList.style.display = 'none';
+    } else if (type === 'csm') {
+      titleEl.textContent = 'Construction Safety Manual (CSM)';
+      if (jsaSearchWrapper) jsaSearchWrapper.style.display = 'none';
+      if (tbtSearchWrapper) tbtSearchWrapper.style.display = 'none';
+      if (csmSearchWrapper) csmSearchWrapper.style.display = 'block';
+      jsaList.style.display = 'none';
+      tbtList.style.display = 'none';
+      if (csmList) csmList.style.display = 'block';
+    }
+
+    // scroll to top of content
+    content.scrollTop = 0;
+  }
+
+  backBtn.addEventListener('click', showChooser);
+
+  $all('.library-choice-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const type = card.dataset.library;
+      openLibrary(type);
     });
   });
+
+  // Default state
+  showChooser();
+}
+  
+// -------------------- Tools (KPI / Heat / Wind) --------------------
+
+  // Heat index formula: convert C to F, apply NOAA formula, back to C
+  function calculateHeatIndexC(tempC, humidity) {
+    if (tempC == null || humidity == null) return null;
+    const T = tempC * 9 / 5 + 32;
+    const R = humidity;
+
+    const HI =
+      -42.379 +
+      2.04901523 * T +
+      10.14333127 * R -
+      0.22475541 * T * R -
+      0.00683783 * T * T -
+      0.05481717 * R * R +
+      0.00122874 * T * T * R +
+      0.00085282 * T * R * R -
+      0.00000199 * T * T * R * R;
+
+    const C = (HI - 32) * 5 / 9;
+    return C;
+  }
+
+  function classifyHeatRisk(heatIndexC) {
+    if (heatIndexC == null || isNaN(heatIndexC)) return { label: '--', level: 'unknown' };
+    if (heatIndexC < 29) return { label: 'Safe', level: 'safe' };
+    if (heatIndexC < 29) return { label: 'Caution', level: 'caution' };
+    if (heatIndexC < 38) return { label: 'Extreme Caution', level: 'warning' };
+    if (heatIndexC < 51) return { label: 'Danger', level: 'danger' };
+    return { label: 'Extreme Danger', level: 'extreme' };
+  }
+
+  function classifyWindRisk(speed) {
+    if (speed == null || isNaN(speed)) return { label: '--', level: 'unknown' };
+    // Saudi Aramco CSM I-11: Manbaskets limit is 32 km/h
+    if (speed < 20) return { label: 'Safe for normal work', level: 'safe' };
+    if (speed < 32) return { label: 'Caution – Approaching man-basket limit', level: 'caution' };
+    return { label: 'STOP Man-basket Operations (>32km/h)', level: 'danger' };
+  }
+
+
+function formatWindDirection(deg) {
+  if (deg == null || isNaN(deg)) return '';
+  const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  const index = Math.round(deg / 45) % 8;
+  return dirs[index];
 }
 
-// =========================
-//  HEAT INDEX
-// =========================
+function updateHomeEnvironmentFromWeather(payload) {
+  const homeHeat = $('#homeHeatSummary');
+  const homeWind = $('#homeWindSummary');
+  const hint = $('#homeEnvHint');
 
-function calculateHeatIndex() {
-  const tEl = document.getElementById("inputTemp");
-  const hEl = document.getElementById("inputHumidity");
-  const resCard = document.getElementById("heatIndexResultCard");
-  const valEl = document.getElementById("heatIndexValue");
-  const lvlEl = document.getElementById("heatRiskLevel");
-  const listEl = document.getElementById("heatRecommendationsList");
-  const homeHeat = document.getElementById("homeHeatSummary");
+  if (!homeHeat || !homeWind) return;
 
-  if (!tEl || !hEl || !resCard || !valEl || !lvlEl || !listEl) return;
+  const { tempC, humidity, windSpeed, windDir } = payload || {};
 
-  const T = parseFloat(tEl.value);
-  const R = parseFloat(hEl.value);
-
-  if (isNaN(T) || isNaN(R)) {
-    resCard.style.display = "none";
-    if (homeHeat) homeHeat.textContent = "--";
-    return;
-  }
-
-  // Rothfusz regression – temp in °C converted to °F
-  const Tc = T;
-  const Tf = (Tc * 9) / 5 + 32;
-  const HI_F =
-    -42.379 +
-    2.04901523 * Tf +
-    10.14333127 * R -
-    0.22475541 * Tf * R -
-    0.00683783 * Tf * Tf -
-    0.05481717 * R * R +
-    0.00122874 * Tf * Tf * R +
-    0.00085282 * Tf * R * R -
-    0.00000199 * Tf * Tf * R * R;
-
-  const HI_C = ((HI_F - 32) * 5) / 9;
-  const rounded = Math.round(HI_C);
-
-  let category = "";
-  let bg = "#27ae60";
-  const recs = [];
-
-  if (rounded < 27) {
-    category = "Caution";
-    bg = "#27ae60";
-    recs.push("Normal precautions. Hydrate regularly.");
-  } else if (rounded < 32) {
-    category = "Extreme Caution";
-    bg = "#f39c12";
-    recs.push("Increase water breaks. Monitor workers frequently.");
-  } else if (rounded < 41) {
-    category = "Danger";
-    bg = "#e67e22";
-    recs.push("Enforce work-rest cycles. Provide shaded rest areas.");
-    recs.push("Watch for signs of heat stress.");
-  } else {
-    category = "Extreme Danger";
-    bg = "#c0392b";
-    recs.push("Stop non-critical work. Move workers to cool areas.");
-    recs.push("Immediate medical attention for any symptoms.");
-  }
-
-  resCard.style.display = "block";
-  resCard.style.backgroundColor = bg;
-  valEl.textContent = rounded + "°C";
-  lvlEl.textContent = category;
-  listEl.innerHTML = recs.map(r => `<li>${r}</li>`).join("");
-
-  if (homeHeat) {
-    homeHeat.textContent = `${category} (${rounded}°C HI)`;
-  }
-}
-
-// =========================
-//  WIND SPEED
-// =========================
-
-function calculateWindSafety() {
-  const wEl = document.getElementById("inputWind");
-  const resCard = document.getElementById("windSpeedResultCard");
-  const valEl = document.getElementById("windValue");
-  const lvlEl = document.getElementById("windRiskLevel");
-  const listEl = document.getElementById("windRecommendationsList");
-  const homeWind = document.getElementById("homeWindSummary");
-
-  if (!wEl || !resCard || !valEl || !lvlEl || !listEl) return;
-
-  const v = parseFloat(wEl.value);
-  if (isNaN(v)) {
-    resCard.style.display = "none";
-    if (homeWind) homeWind.textContent = "--";
-    return;
-  }
-
-  let category = "";
-  let bg = "#27ae60";
-  const recs = [];
-
-  if (v < 32) {
-    category = "Safe";
-    bg = "#27ae60";
-    recs.push("Normal crane operations allowed.");
-  } else if (v < 38) {
-    category = "Caution";
-    bg = "#f39c12";
-    recs.push("Review crane operations. Consider reducing load.");
-  } else if (v < 55) {
-    category = "Restricted";
-    bg = "#e67e22";
-    recs.push("Stop man-basket and high-risk lifts.");
-    recs.push("Only essential lifts with approval.");
-  } else {
-    category = "Stop Work";
-    bg = "#c0392b";
-    recs.push("Stop all lifting operations.");
-  }
-
-  resCard.style.display = "block";
-  resCard.style.backgroundColor = bg;
-  valEl.textContent = v.toFixed(1) + " km/h";
-  lvlEl.textContent = category;
-  listEl.innerHTML = recs.map(r => `<li>${r}</li>`).join("");
-
-  if (homeWind) {
-    homeWind.textContent = `${category} (${v.toFixed(0)} km/h)`;
-  }
-}
-
-// =========================
-//  TOOLS TAB SWITCHING
-// =========================
-
-function switchTool(tool) {
-  const buttons = document.querySelectorAll(".tool-toggle-btn");
-  buttons.forEach(btn => {
-    const t = btn.getAttribute("data-tool");
-    if (t === tool) {
-      btn.classList.add("active-tool");
-    } else {
-      btn.classList.remove("active-tool");
+  // ----- Heat index -----
+  let heatText = '--';
+  if (typeof tempC === 'number' && typeof humidity === 'number') {
+    const hiC = calculateHeatIndexC(tempC, humidity);
+    const risk = classifyHeatRisk(hiC);
+    if (hiC != null && !isNaN(hiC) && risk) {
+      const roundedHi = Math.round(hiC);
+      heatText = `${roundedHi}°C HI – ${risk.label}`;
     }
-  });
+  }
+  homeHeat.textContent = heatText;
 
-  const kpiSec = document.getElementById("kpiSection");
-  const heatSec = document.getElementById("heatStressSection");
-  const windSec = document.getElementById("windSpeedSection");
-
-  if (kpiSec) kpiSec.style.display = tool === "kpi" ? "block" : "none";
-  if (heatSec) kpiSec && (heatSec.style.display = tool === "heat" ? "block" : "none");
-  if (windSec) windSec.style.display = tool === "wind" ? "block" : "none";
-}
-
-// =========================
-//  OBSERVATIONS
-// =========================
-
-function loadObservations() {
-  if (!OBS_CSV_URL || !OBS_CSV_URL.startsWith("http")) {
-    observationsAll = [];
-    observationsLoaded = false;
-    updateObservationUI();
-    return;
+  const homeHeatCard = homeHeat.closest('.home-env-card');
+  if (homeHeatCard) {
+    homeHeatCard.style.backgroundColor = 'var(--surface-soft)';
+    homeHeatCard.style.color = '';
+    homeHeatCard.style.border = '1px dashed rgba(148, 163, 184, 0.65)';
   }
 
-  fetch(OBS_CSV_URL)
-    .then(res => res.text())
-    .then(text => {
-      const rows = parseCsv(text);
-      const mapped = rows.map((r, idx) => {
-  // Your sheet columns:
-  // Date, Day, Group #, Activity Type, Observation Class, Observation Types,
-  // Injury/No Injury, Type of Injury, Description, Name, ID, Position,
-  // Direct Cause, Root Cause, Equipment / Tool, Area, Likelihood, Severity,
-  // RA Rate, RA Level, Report Status, CSM, Comment
+  // ----- Wind -----
+  let windText = '--';
+  if (typeof windSpeed === 'number') {
+    const risk = classifyWindRisk(windSpeed);
+    const roundedWind = Math.round(windSpeed);
+    const dirLabel = formatWindDirection(windDir);
+    if (risk && risk.label) {
+      windText = dirLabel
+        ? `${roundedWind} km/h ${dirLabel} – ${risk.label}`
+        : `${roundedWind} km/h – ${risk.label}`;
+    } else {
+      windText = `${roundedWind} km/h`;
+    }
+  }
+  homeWind.textContent = windText;
 
-  const dateStr = r.Date || "";                  // main date
-  const date = parseObsDate(dateStr);
+  const homeWindCard = homeWind.closest('.home-env-card');
+  if (homeWindCard) {
+    homeWindCard.style.backgroundColor = 'var(--surface-soft)';
+    homeWindCard.style.color = '';
+    homeWindCard.style.border = '1px dashed rgba(148, 163, 184, 0.65)';
+  }
 
-  // Use Area as "location" in the UI
-  const location = r.Area || r["Group #"] || "";
+  if (hint) {
+    const bits = [];
+    if (typeof tempC === 'number') bits.push(`Temp ${Math.round(tempC)}°C`);
+    if (typeof humidity === 'number') bits.push(`RH ${Math.round(humidity)}%`);
+    if (typeof windSpeed === 'number') bits.push(`Wind ${Math.round(windSpeed)} km/h`);
 
-  // Show observation type/class as "Type"
-  const type =
-    r["Observation Types"] ||
-    r["Observation Class"] ||
-    r["Activity Type"] ||
-    "";
+    if (bits.length) {
+      hint.textContent =
+        'Live data for your approximate location – ' +
+        bits.join(' · ') +
+        '. Always verify against site instruments before making safety decisions.';
+    } else {
+      hint.textContent =
+        'Unable to read full weather data. Please use site instruments and the Tools tab for manual calculations.';
+    }
+  }
+}
 
-  // Use RA Level as risk (High / Medium / Low)
-  const risk =
-    r["RA Level"] ||
-    r["RA Rate"] ||
-    r.Severity ||
-    r.Likelihood ||
-    "";
+function loadWeatherForCoords(lat, lon) {
+  const hint = $('#homeEnvHint');
+  const homeHeat = $('#homeHeatSummary');
+  const homeWind = $('#homeWindSummary');
 
-  // Use Report Status as status (Open / Closed / In Progress...)
-  const status = r["Report Status"] || "";
+  if (homeHeat) homeHeat.textContent = 'Loading...';
+  if (homeWind) homeWind.textContent = 'Loading...';
+  if (hint) {
+    hint.textContent = 'Loading weather for your approximate location...';
+  }
 
-  // Use Name (and fall back to ID if needed) as reporter
-  const reporter = r.Name || r.ID || "";
+  const url =
+    'https://api.open-meteo.com/v1/forecast' +
+    `?latitude=${encodeURIComponent(lat)}` +
+    `&longitude=${encodeURIComponent(lon)}` +
+    '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m' +
+    '&timezone=auto';
 
-  return {
-    id: idx + 1,
-    raw: r,
-    dateStr,
-    date,
-    location,
-    type,
-    risk,
-    status,
-    reporter
-  };
-});
+  fetch(url)
+    .then(res => {
+      if (!res.ok) {
+        throw new Error('Weather service error');
+      }
+      return res.json();
+    })
+    .then(data => {
+      const current = data && data.current;
+      if (!current) {
+        throw new Error('No current weather data returned');
+      }
 
-
-      observationsAll = mapped;
-      observationsLoaded = true;
-      updateObservationUI();
+      updateHomeEnvironmentFromWeather({
+        tempC:
+          typeof current.temperature_2m === 'number'
+            ? current.temperature_2m
+            : null,
+        humidity:
+          typeof current.relative_humidity_2m === 'number'
+            ? current.relative_humidity_2m
+            : null,
+        windSpeed:
+          typeof current.wind_speed_10m === 'number'
+            ? current.wind_speed_10m
+            : null,
+        windDir:
+          typeof current.wind_direction_10m === 'number'
+            ? current.wind_direction_10m
+            : null
+      });
     })
     .catch(err => {
-      console.error("Observations load error:", err);
-      observationsAll = [];
-      observationsLoaded = false;
-      updateObservationUI("Error loading observations data.");
+      console.error('Weather fetch failed', err);
+      if (hint) {
+        hint.textContent =
+          'Unable to load weather for your location. Please check your connection or try again later.';
+      }
     });
 }
 
-function updateObservationUI(errorMsg) {
-  const monthEl = document.getElementById("obsCountMonth");
-  const openEl = document.getElementById("obsCountOpen");
-  const closedEl = document.getElementById("obsCountClosed");
-  const listEl = document.getElementById("observationsList");
-  const emptyEl = document.getElementById("observationsEmptyState");
-  const homeObs = document.getElementById("homeObservationsToday");
-  const homeObsPeople = document.getElementById("homeObserversToday");
-  const homeHigh = document.getElementById("homeHighRiskOpen");
+function askGeoAndLoadWeather() {
+  const hint = $('#homeEnvHint');
 
-  if (!listEl || !monthEl || !openEl || !closedEl) return;
+  if (!navigator.geolocation) {
+    if (hint) {
+      hint.textContent =
+        'Geolocation is not supported on this device. Enter values manually in the Tools tab.';
+    }
+    return;
+  }
 
-  if (!observationsLoaded || !observationsAll.length) {
-    monthEl.textContent = "--";
-    openEl.textContent = "--";
-    closedEl.textContent = "--";
-    if (homeObs) homeObs.textContent = "--";
-    if (homeObsPeople) homeObsPeople.textContent = "--";
-    if (homeHigh) homeHigh.textContent = "--";
+  if (hint) {
+    hint.textContent =
+      'Getting your location (you may need to allow permission)...';
+  }
 
-    listEl.innerHTML = "";
-    if (emptyEl) {
-      emptyEl.style.display = "block";
-      if (errorMsg) {
-        emptyEl.innerHTML = `
-          <i class="fas fa-exclamation-circle"></i>
-          <p>${errorMsg}</p>
-        `;
-      } else {
-        emptyEl.innerHTML = `
-          <i class="fas fa-database"></i>
-          <p>No observations data loaded. Check OBSERVATIONS_SHEET_CSV_URL in js/data.js.</p>
-        `;
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const { latitude, longitude } = pos.coords || {};
+      if (latitude == null || longitude == null) {
+        if (hint) {
+          hint.textContent =
+            'Could not read GPS coordinates. Please try again or use manual input in the Tools tab.';
+        }
+        return;
+      }
+      loadWeatherForCoords(latitude, longitude);
+    },
+    err => {
+      if (hint) {
+        hint.textContent =
+          'Unable to get your location: ' +
+          err.message +
+          '. You can still use the Tools tab for manual calculations.';
+      }
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
+
+
+function calculateHeatIndex() {
+  const tempInput = $('#inputTemp');
+  const humInput = $('#inputHumidity');
+  const valueEl = $('#heatIndexValue');
+  const levelEl = $('#heatRiskLevel');
+  const listEl = $('#heatRecommendationsList');
+  const homeHeat = $('#homeHeatSummary');
+  const cardEl = $('#heatIndexResultCard');
+
+  if (!tempInput || !humInput || !valueEl || !levelEl || !listEl || !cardEl) return;
+
+  const t = parseFloat(tempInput.value);
+  const h = parseFloat(humInput.value);
+
+  // If fields are empty or not numbers, reset card + home card
+  if (isNaN(t) || isNaN(h)) {
+    valueEl.textContent = '--';
+    levelEl.textContent = '--';
+    listEl.innerHTML = '<li>Enter temperature and humidity to see results.</li>';
+
+    cardEl.style.backgroundColor = '';
+    cardEl.style.color = '';
+    cardEl.style.borderColor = '';
+
+    levelEl.style.backgroundColor = '';
+    levelEl.style.color = '';
+    listEl.style.color = '';
+
+    if (homeHeat) {
+      homeHeat.textContent = '--';
+      const homeHeatCard = homeHeat.closest('.home-env-card');
+      if (homeHeatCard) {
+        homeHeatCard.style.backgroundColor = '';
+        homeHeatCard.style.color = '';
+        homeHeatCard.style.border = '';
       }
     }
     return;
   }
 
-  if (emptyEl) emptyEl.style.display = "none";
+  const heatC = calculateHeatIndexC(t, h);
+  const risk = classifyHeatRisk(heatC);
 
-  const now = new Date();
-  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  if (heatC == null || isNaN(heatC)) {
+    valueEl.textContent = '--';
+    levelEl.textContent = '--';
+    listEl.innerHTML = '<li>Enter temperature and humidity to see results.</li>';
 
-  const monthObs = observationsAll.filter(o => o.date && o.date >= firstOfMonth);
-  const openObs = observationsAll.filter(o =>
-    String(o.status).toLowerCase().includes("open")
-  );
-  const closedObs = observationsAll.filter(o =>
-    String(o.status).toLowerCase().includes("closed")
-  );
+    cardEl.style.backgroundColor = '';
+    cardEl.style.color = '';
+    cardEl.style.borderColor = '';
 
-  monthEl.textContent = monthObs.length;
-  openEl.textContent = openObs.length;
-  closedEl.textContent = closedObs.length;
+    levelEl.style.backgroundColor = '';
+    levelEl.style.color = '';
+    listEl.style.color = '';
 
-  // Home KPIs
-  const today = startOfDay(now);
-  const todayObs = observationsAll.filter(
-    o => o.date && isSameDay(o.date, today)
-  );
-  const peopleSet = new Set(
-    todayObs
-      .map(o => o.reporter)
-      .filter(Boolean)
-  );
-  const highRiskOpen = observationsAll.filter(
-    o =>
-      String(o.risk).toLowerCase().includes("high") &&
-      String(o.status).toLowerCase().includes("open")
-  );
+    if (homeHeat) {
+      homeHeat.textContent = '--';
+      const homeHeatCard = homeHeat.closest('.home-env-card');
+      if (homeHeatCard) {
+        homeHeatCard.style.backgroundColor = '';
+        homeHeatCard.style.color = '';
+        homeHeatCard.style.border = '';
+      }
+    }
+    return;
+  }
 
-  if (homeObs) homeObs.textContent = todayObs.length;
-  if (homeObsPeople) homeObsPeople.textContent = peopleSet.size;
-  if (homeHigh) homeHigh.textContent = highRiskOpen.length;
+  const rounded = Math.round(heatC);
+  valueEl.textContent = `${rounded}°C`;
 
-  renderObservationList();
+  // 🔁 Lowest category in UI is Caution (no "Safe")
+  let label = risk && risk.label ? risk.label : 'Caution';
+  if (label === 'Safe') label = 'Caution';
+
+  // Default styling
+  let bg = '#22c55e';
+  let textColor = '#ffffff';
+  let tagBg = 'rgba(15,23,42,0.30)';
+  let tagColor = '#ffffff';
+
+  let details = {
+    symptoms: '',
+    workRest: '',
+    water: '',
+    controls: ''
+  };
+
+  switch (label) {
+    case 'Caution':
+    case 'Safe':
+      bg = '#22c55e'; // green
+      textColor = '#ffffff';
+      tagBg = 'rgba(15,23,42,0.3)';
+      tagColor = '#ffffff';
+      details = {
+        symptoms: 'Fatigue possible with prolonged exposure and/or physical activity.',
+        workRest: 'Normal/Scheduled.',
+        water: '1 cup (250ml) every 20 minutes.',
+        controls: 'Visual monitorings workers in in direct sun and heavy work.'
+      };
+      break;
+
+    case 'Extreme Caution':
+      bg = '#facc15'; // yellow
+      textColor = '#ffffff';
+      tagBg = 'rgba(15,23,42,0.4)';
+      tagColor = '#ffffff';
+      details = {
+        symptoms: 'Heat cramps, heat, exhaustion, or heat stroke likely with prolonged exposure and physical activity',
+        workRest: '50:10.',
+        water: '1 cup (250ml) every 20 minutes.',
+        controls: 'No working alone (buddy system).'
+      };
+      break;
+
+    case 'Danger':
+      bg = '#f97316'; // orange
+      textColor = '#ffffff';
+      tagBg = 'rgba(15,23,42,0.45)';
+      tagColor = '#ffffff';
+      details = {
+        symptoms: 'Heat cramps, heat, exhaustion, or heat stroke likely with prolonged exposure and physical activity',
+        workRest: '30:10',
+        water: '1 cup (250ml) every 15 minutes.',
+        controls: 'Work unnder shade.'
+      };
+      break;
+
+    case 'Extreme Danger':
+      bg = '#dc2626'; // red
+      textColor = '#ffffff';
+      tagBg = 'rgba(15,23,42,0.5)';
+      tagColor = '#ffffff';
+      details = {
+        symptoms: 'Collapse, loss of consciousness, heat stroke possible.',
+        workRest: '20:10.',
+        water: '1 cup (250ml) every 10 minutes.',
+        controls: '<li>Assess the risks of working in direct sunlight for an extended period of time, and determine if the work should continue.</li><li>Use engineering controls such as shade and ventilation/ cooling systems for work activities that involve increased risk.</li><li>Seek immediate medical attention for workers exhibiting symptoms of serious heat-related illness.</li><li>Establish and maintain break periods during work activities.</li><li>Drink one cup of water every 10 minutes using a personal water bottle/insulated container (2-liter capacity).</li><li>Do not work alone (i.e., isolated).</li><li>Take extra precautions when flame resistant clothing is required, as such fabrics can intensify heat stress.</li><li>Do not wear fabrics that may increase heat stress (e.g., polyester, nylon).</li>.'
+      };
+      break;
+
+    default:
+      bg = '#64748b';
+      textColor = '#ffffff';
+      tagBg = 'rgba(15,23,42,0.35)';
+      tagColor = '#ffffff';
+      details = {
+        symptoms: 'Check inputs and site heat-stress guideline.',
+        workRest: 'Follow site GI / CSM recommendations.',
+        water: 'Ensure regular drinking schedule is in place.',
+        controls: 'Consult HSE for correct category and controls.'
+      };
+      break;
+  }
+
+  // 👉 Tools tab card colors
+  cardEl.style.backgroundColor = bg;
+  cardEl.style.color = textColor;
+  cardEl.style.borderColor = 'rgba(15,23,42,0.15)';
+
+  levelEl.textContent = label;
+  levelEl.style.backgroundColor = tagBg;
+  levelEl.style.color = tagColor;
+
+  listEl.style.color = textColor;
+  listEl.innerHTML = `
+    <li><strong>Symptoms:</strong> ${details.symptoms}</li>
+    <li><strong>Work / Rest Periods:</strong> ${details.workRest}</li>
+    <li><strong>Min. Water Needed:</strong> ${details.water}</li>
+    <li><strong>Progressive Controls:</strong> ${details.controls}</li>
+  `;
+
+  // 👉 Home tab mini card (same color)
+  if (homeHeat) {
+    homeHeat.textContent = `${label} (${rounded}°C HI)`;
+    state.lastHeatSummary = homeHeat.textContent;
+
+    const homeHeatCard = homeHeat.closest('.home-env-card');
+    if (homeHeatCard) {
+      homeHeatCard.style.backgroundColor = bg;
+      homeHeatCard.style.color = '#ffffff';
+      homeHeatCard.style.border = '1px solid rgba(15,23,42,0.20)';
+    }
+  }
 }
 
-function initObservationFiltersUI() {
-  const rangeButtons = document.querySelectorAll(".obs-filter-chip");
+  window.calculateHeatIndex = calculateHeatIndex;
+
+function calculateWindSafety() {
+  const windInput = $('#inputWind');
+  const valueEl = $('#windValue');
+  const levelEl = $('#windRiskLevel');
+  const listEl = $('#windRecommendationsList');
+  const homeWind = $('#homeWindSummary');
+  const cardEl = $('#windSpeedResultCard');
+
+  if (!windInput || !valueEl || !levelEl || !listEl || !cardEl) return;
+
+  const v = parseFloat(windInput.value);
+
+  // Reset state if invalid
+  if (v == null || isNaN(v)) {
+    valueEl.textContent = '--';
+    levelEl.textContent = '--';
+    listEl.innerHTML = '<li>Enter wind speed to see limits.</li>';
+
+    cardEl.style.backgroundColor = '';
+    cardEl.style.color = '';
+    cardEl.style.borderColor = '';
+
+    levelEl.style.backgroundColor = '';
+    levelEl.style.color = '';
+    listEl.style.color = '';
+
+    if (homeWind) {
+      homeWind.textContent = '--';
+      const homeWindCard = homeWind.closest('.home-env-card');
+      if (homeWindCard) {
+        homeWindCard.style.backgroundColor = '';
+        homeWindCard.style.color = '';
+        homeWindCard.style.border = '';
+      }
+    }
+    return;
+  }
+
+  const risk = classifyWindRisk(v); // your existing helper
+
+  valueEl.textContent = `${v.toFixed(0)} km/h`;
+
+  // Default: green (safe)
+  let bg = '#22c55e';
+  let textColor = '#ffffff';
+  let tagBg = 'rgba(15,23,42,0.30)';
+  let tagColor = '#ffffff';
+
+  let details = {
+    operations: '',
+    manbasket: '',
+    monitoring: '',
+    controls: ''
+  };
+
+  switch (risk.level) {
+    case 'safe':
+      // 🟢 Safe – normal work
+      bg = '#22c55e';
+      textColor = '#ffffff';
+      tagBg = 'rgba(15,23,42,0.35)';
+      tagColor = '#ffffff';
+      details = {
+        operations: 'Normal crane and equipment operations allowed per approved lift plan.',
+        manbasket: 'Personnel platforms allowed below 32 km/h with full pre-use checks.',
+        monitoring: 'Check wind at least every 30 minutes and whenever conditions change.',
+        controls: 'Ensure calibrated anemometer, clear communications, follow CSM I-11 limits.'
+      };
+      break;
+
+    case 'caution':
+      // 🟡 Caution – approaching limit
+      bg = '#facc15';
+      textColor = '#ffffff';
+      tagBg = 'rgba(15,23,42,0.45)';
+      tagColor = '#ffffff';
+      details = {
+        operations: 'Limit or postpone non-essential lifts; reduce radius / load where possible.',
+        manbasket: 'Review the need for man-basket; be ready to suspend if speed increases.',
+        monitoring: 'Continuous monitoring with readings logged; watch for gusts.',
+        controls: 'Brief crew, extend exclusion zone, supervisor to approve each lift individually.'
+      };
+      break;
+
+    case 'danger':
+      // 🔴 Danger – above man-basket limit
+      bg = '#dc2626';
+      textColor = '#ffffff';
+      tagBg = 'rgba(15,23,42,0.55)';
+      tagColor = '#ffffff';
+      details = {
+        operations: 'Suspend non-critical crane / lifting operations until wind returns to safe limits.',
+        manbasket: 'STOP all man-basket / personnel platform operations and lower basket safely.',
+        monitoring: 'Continue monitoring; only restart when wind is stable back in safe range.',
+        controls: 'Notify supervisor / HSE, apply Stop Work Authority, barricade the area per CSM.'
+      };
+      break;
+
+    default:
+      bg = '#64748b';
+      textColor = '#ffffff';
+      tagBg = 'rgba(15,23,42,0.40)';
+      tagColor = '#ffffff';
+      details = {
+        operations: 'Check input values and refer to site wind-limit guideline.',
+        manbasket: 'Follow man-basket limits from CSM / GI.',
+        monitoring: 'Keep monitoring until a clear category is confirmed.',
+        controls: 'Consult HSE for correct limits and required controls.'
+      };
+      break;
+  }
+
+  // 👉 Tools tab card
+  cardEl.style.backgroundColor = bg;
+  cardEl.style.color = textColor;
+  cardEl.style.borderColor = 'rgba(15,23,42,0.15)';
+
+  levelEl.textContent = risk.label;
+  levelEl.style.backgroundColor = tagBg;
+  levelEl.style.color = tagColor;
+
+  listEl.style.color = textColor;
+  listEl.innerHTML = `
+    <li><strong>Crane &amp; Equipment:</strong> ${details.operations}</li>
+    <li><strong>Man-basket / Personnel:</strong> ${details.manbasket}</li>
+    <li><strong>Monitoring:</strong> ${details.monitoring}</li>
+    <li><strong>Required Controls:</strong> ${details.controls}</li>
+  `;
+
+  // 👉 Home tab mini card
+  if (homeWind) {
+    homeWind.textContent = `${risk.label} (${v.toFixed(0)} km/h)`;
+    state.lastWindSummary = homeWind.textContent;
+
+    const homeWindCard = homeWind.closest('.home-env-card');
+    if (homeWindCard) {
+      homeWindCard.style.backgroundColor = bg;
+      homeWindCard.style.color = '#ffffff';
+      homeWindCard.style.border = '1px solid rgba(15,23,42,0.20)';
+    }
+  }
+}
+
+  window.calculateWindSafety = calculateWindSafety;
+
+  function setupTools() {
+    const kpiBtn = document.querySelector('[data-tool="kpi"]');
+    const heatBtn = document.querySelector('[data-tool="heat"]');
+    const windBtn = document.querySelector('[data-tool="wind"]');
+    const kpiSection = $('#kpiSection');
+    const heatSection = $('#heatStressSection');
+    const windSection = $('#windSpeedSection');
+
+    function setActive(tool) {
+      [kpiBtn, heatBtn, windBtn].forEach(btn => btn && btn.classList.remove('active-tool'));
+      if (tool === 'kpi' && kpiBtn) kpiBtn.classList.add('active-tool');
+      if (tool === 'heat' && heatBtn) heatBtn.classList.add('active-tool');
+      if (tool === 'wind' && windBtn) windBtn.classList.add('active-tool');
+
+      if (kpiSection) kpiSection.style.display = tool === 'kpi' ? 'block' : 'none';
+      if (heatSection) heatSection.style.display = tool === 'heat' ? 'block' : 'none';
+      if (windSection) windSection.style.display = tool === 'wind' ? 'block' : 'none';
+    }
+
+    if (kpiBtn) kpiBtn.addEventListener('click', () => setActive('kpi'));
+    if (heatBtn) heatBtn.addEventListener('click', () => setActive('heat'));
+    if (windBtn) windBtn.addEventListener('click', () => setActive('wind'));
+
+    // expose for old inline onclick, if it exists
+    window.switchTool = setActive;
+
+    // default
+    setActive('kpi');
+  }
+
+// -------------------- Observations (CSV) --------------------
+
+async function loadObservations() {
+  const url = window.OBSERVATIONS_SHEET_CSV_URL;
+  const emptyState = $('#observationsEmptyState');
+  if (!url) {
+    if (emptyState) {
+      emptyState.style.display = 'block';
+      emptyState.querySelector('p').textContent =
+        'No observations sheet configured. Set OBSERVATIONS_SHEET_CSV_URL in js/data.js.';
+    }
+    return;
+  }
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    const rows = parseCSV(text);
+    if (!rows.length) throw new Error('Empty sheet');
+
+    const headers = rows[0];
+    const body = rows.slice(1).filter(r => r.some(c => c && c.trim() !== ''));
+
+    const idxCode = findColumnIndex(headers, ['Code']);
+    const idxDate = findColumnIndex(headers, ['Date']);
+    const idxDay = findColumnIndex(headers, ['Day']);
+    const idxGroup = findColumnIndex(headers, ['Group #', 'Group', 'Group No', 'Group Number']);
+
+    const idxType = findColumnIndex(headers, ['Activity Type', 'Observation Types', 'Observation Type']);
+    const idxClass = findColumnIndex(headers, ['Observation Class']);
+    const idxObsTypes = findColumnIndex(headers, ['Observation Types']);
+
+    const idxInjuryFlag = findColumnIndex(headers, ['Injury/No Injury', 'Injury / No Injury']);
+    const idxInjuryType = findColumnIndex(headers, ['Type of Injury', 'Injury Type']);
+
+    const idxDesc = findColumnIndex(headers, ['Description', 'Details']);
+    const idxName = findColumnIndex(headers, ['Name', 'Observer', 'Reported By']);
+    const idxId = findColumnIndex(headers, ['ID', 'Badge', 'Iqama']);
+    const idxPosition = findColumnIndex(headers, ['Position', 'Job Title']);
+
+    const idxDirect = findColumnIndex(headers, ['Direct Cause']);
+    const idxRoot = findColumnIndex(headers, ['Root Cause']);
+    const idxEquip = findColumnIndex(headers, ['Equipment / Tool', 'Equipment', 'Tool']);
+
+    const idxArea = findColumnIndex(headers, ['Area', 'Location']);
+    const idxLikelihood = findColumnIndex(headers, ['Likelihood']);
+    const idxSeverity = findColumnIndex(headers, ['Severity']);
+    const idxRaRate = findColumnIndex(headers, ['RA Rate', 'Risk Rate']);
+    const idxRaLevel = findColumnIndex(headers, ['RA Level', 'Risk Level']);
+    const idxStatus = findColumnIndex(headers, ['Report Status', 'Status']);
+    const idxGi = findColumnIndex(headers, ['GI Number #', 'GI Number', 'GI #']);
+    const idxComments = findColumnIndex(headers, ['Comments', 'Comment']);
+    const idxEvidence = findColumnIndex(headers, [
+      'Observations Evidents',
+      'Observation Evidence',
+      'Evidence',
+      'Observation Evident',
+      'Evidence Link'
+    ]);
+
+    const observations = body.map(row => {
+      const dateRaw = idxDate !== -1 ? row[idxDate] : '';
+      const date = parseSheetDate(dateRaw);
+      const groupVal = idxGroup !== -1 ? (row[idxGroup] || '') : '';
+
+      const evidenceRaw = idxEvidence !== -1 ? (row[idxEvidence] || '') : '';
+      const evidenceLinks = parseEvidenceLinks(evidenceRaw);
+
+      return {
+        // Basic identifiers
+        code: idxCode !== -1 ? (row[idxCode] || '') : '',
+        date,
+        dateRaw,
+        day: idxDay !== -1 ? (row[idxDay] || '') : '',
+        group: groupVal,
+
+        // Type / classification
+        type: idxType !== -1 ? (row[idxType] || '') : '',
+        obsClass: idxClass !== -1 ? (row[idxClass] || '') : '',
+        obsTypes: idxObsTypes !== -1 ? (row[idxObsTypes] || '') : '',
+
+        // Injury info
+        injuryFlag: idxInjuryFlag !== -1 ? (row[idxInjuryFlag] || '') : '',
+        injuryType: idxInjuryType !== -1 ? (row[idxInjuryType] || '') : '',
+
+        // Description & person
+        description: idxDesc !== -1 ? (row[idxDesc] || '') : '',
+
+        // 👇 Reporter is always the group name
+        reporter: groupVal,
+        id: idxId !== -1 ? (row[idxId] || '') : '',
+        position: idxPosition !== -1 ? (row[idxPosition] || '') : '',
+
+        // Causes
+        directCause: idxDirect !== -1 ? (row[idxDirect] || '') : '',
+        rootCause: idxRoot !== -1 ? (row[idxRoot] || '') : '',
+
+        // Equipment / area
+        equipment: idxEquip !== -1 ? (row[idxEquip] || '') : '',
+        area: idxArea !== -1 ? (row[idxArea] || '') : '',
+
+        // Risk assessment
+        likelihood: idxLikelihood !== -1 ? (row[idxLikelihood] || '') : '',
+        severity: idxSeverity !== -1 ? (row[idxSeverity] || '') : '',
+        raRate: idxRaRate !== -1 ? (row[idxRaRate] || '') : '',
+        raLevel: idxRaLevel !== -1 ? (row[idxRaLevel] || '') : '',
+        status: idxStatus !== -1 ? (row[idxStatus] || '') : '',
+
+        // GI / comments
+        giNumber: idxGi !== -1 ? (row[idxGi] || '') : '',
+        comments: idxComments !== -1 ? (row[idxComments] || '') : '',
+
+        // Evidence
+        evidenceLinks,
+        evidenceUrl: evidenceLinks[0] || '',
+        hasEvidence: evidenceLinks.length > 0
+      };
+    });
+
+    state.observations = observations;
+    state.observationsLoaded = true;
+
+    updateHomeFromObservations();
+    setupObservationsFilters();
+    renderObservationsList();
+  } catch (err) {
+    console.error('Observations load error:', err);
+    const list = $('#observationsList');
+    if (list) list.innerHTML = '';
+    if (emptyState) emptyState.style.display = 'block';
+  }
+}
+
+function updateHomeFromObservations() {
+  const obs = state.observations;
+  if (!obs.length) return;
+  const today = startOfDay(new Date());
+
+  const todayObs = obs.filter(o => o.date && isSameDay(o.date, today));
+  const observersToday = new Set(todayObs.map(o => o.reporter).filter(Boolean)).size;
+  const highRiskOpen = obs.filter(o => {
+    const level = (o.raLevel || '').toLowerCase();
+    const status = (o.status || '').toLowerCase();
+    return level.includes('high') && !status.includes('close');
+  }).length;
+
+  const observersEl = $('#homeObserversToday');
+  const obsTodayEl = $('#homeObservationsToday');
+  const highRiskEl = $('#homeHighRiskOpen');
+
+  if (observersEl) observersEl.textContent = observersToday || '--';
+  if (obsTodayEl) obsTodayEl.textContent = todayObs.length || '--';
+  if (highRiskEl) highRiskEl.textContent = highRiskOpen || '0';
+}
+
+function filterObservationsForRange(list, range) {
+  if (!range || range === 'all') return list.slice();
+  const today = startOfDay(new Date());
+
+  return list.filter(o => {
+    if (!o.date) return false;
+    if (range === 'today') return isSameDay(o.date, today);
+    if (range === 'week') return Math.abs(daysBetween(o.date, today)) <= 7;
+    if (range === 'month') return isSameMonth(o.date, today);
+    return true;
+  });
+}
+
+function updateObservationsSummary() {
+  const obs = state.observations;
+  const monthObs = filterObservationsForRange(obs, 'month');
+
+  const openCount = monthObs.filter(o =>
+    (o.status || '').toLowerCase().includes('open') ||
+    (o.status || '').toLowerCase().includes('progress')
+  ).length;
+
+  const closedCount = monthObs.filter(o =>
+    (o.status || '').toLowerCase().includes('close')
+  ).length;
+
+  const thisMonthEl = $('#obsCountMonth');
+  const openEl = $('#obsCountOpen');
+  const closedEl = $('#obsCountClosed');
+
+  if (thisMonthEl) thisMonthEl.textContent = monthObs.length || '0';
+  if (openEl) openEl.textContent = openCount || '0';
+  if (closedEl) closedEl.textContent = closedCount || '0';
+}
+
+function setupObservationsFilters() {
+  const rangeButtons = $all('.obs-filter-chip');
+  const riskSelect = $('#obsFilterRisk');
+  const statusSelect = $('#obsFilterStatus');
+  const searchInput = $('#obsSearch');
+
   rangeButtons.forEach(btn => {
-    btn.addEventListener("click", () => {
-      rangeButtons.forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-      obsFilters.range = btn.getAttribute("data-range") || "today";
-      renderObservationList();
+    btn.addEventListener('click', () => {
+      rangeButtons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      obsFilterState.range = btn.dataset.range || 'today';
+      renderObservationsList();
     });
   });
 
-  const riskSel = document.getElementById("obsFilterRisk");
-  const statusSel = document.getElementById("obsFilterStatus");
-  const searchEl = document.getElementById("obsSearch");
-
-  if (riskSel) {
-    riskSel.addEventListener("change", () => {
-      obsFilters.risk = riskSel.value;
-      renderObservationList();
+  if (riskSelect) {
+    riskSelect.addEventListener('change', () => {
+      obsFilterState.risk = riskSelect.value || '';
+      renderObservationsList();
     });
   }
-  if (statusSel) {
-    statusSel.addEventListener("change", () => {
-      obsFilters.status = statusSel.value;
-      renderObservationList();
+  if (statusSelect) {
+    statusSelect.addEventListener('change', () => {
+      obsFilterState.status = statusSelect.value || '';
+      renderObservationsList();
     });
   }
-  if (searchEl) {
-    searchEl.addEventListener("input", () => {
-      obsFilters.search = searchEl.value;
-      renderObservationList();
+  if (searchInput) {
+    searchInput.addEventListener('input', () => {
+      obsFilterState.search = searchInput.value.toLowerCase();
+      renderObservationsList();
     });
   }
 
-  const openSheetBtn = document.getElementById("openSheetButton");
+  const openSheetBtn = $('#openSheetButton');
   if (openSheetBtn) {
-    openSheetBtn.addEventListener("click", () => {
-      if (FULL_SHEET_URL && FULL_SHEET_URL.startsWith("http")) {
-        window.open(FULL_SHEET_URL, "_blank");
-      } else {
-        alert("Please configure OBSERVATIONS_FULL_SHEET_URL in js/data.js");
-      }
+    openSheetBtn.addEventListener('click', () => {
+      const url = window.OBSERVATIONS_FULL_SHEET_URL || window.OBSERVATIONS_SHEET_CSV_URL;
+      if (url) window.open(url, '_blank');
     });
   }
 }
 
-function applyObservationFilters() {
-  let list = observationsAll.slice();
-  const now = new Date();
-  const todayStart = startOfDay(now);
+function renderObservationsList() {
+  const listEl = $('#observationsList');
+  const emptyState = $('#observationsEmptyState');
+  if (!listEl) return;
 
-  if (obsFilters.range === "today") {
-    list = list.filter(o => o.date && isSameDay(o.date, todayStart));
-  } else if (obsFilters.range === "week") {
-    const from = daysAgo(7);
-    list = list.filter(o => o.date && o.date >= from);
-  } else if (obsFilters.range === "month") {
-    const first = new Date(now.getFullYear(), now.getMonth(), 1);
-    list = list.filter(o => o.date && o.date >= first);
+  let obs = (state.observations || []).map((o, idx) => ({
+    ...o,
+    _index: idx
+  }));
+
+  if (!obs.length) {
+    listEl.innerHTML = `
+      <div class="obs-empty">
+        <i class="fas fa-info-circle"></i>
+        <p>No observations loaded yet.</p>
+      </div>
+    `;
+    if (emptyState) emptyState.style.display = 'block';
+    updateObservationsSummary();
+    return;
   }
 
-  if (obsFilters.risk) {
-    const r = obsFilters.risk.toLowerCase();
-    list = list.filter(o => String(o.risk).toLowerCase().includes(r));
-  }
-  if (obsFilters.status) {
-    const s = obsFilters.status.toLowerCase();
-    list = list.filter(o => String(o.status).toLowerCase().includes(s));
-  }
+  if (emptyState) emptyState.style.display = 'none';
 
-  if (obsFilters.search) {
-    const q = obsFilters.search.toLowerCase();
-    list = list.filter(o => {
+  // Apply filters
+  obs = filterObservationsForRange(obs, obsFilterState.range);
+
+  if (obsFilterState.risk) {
+    const r = obsFilterState.risk.toLowerCase();
+    obs = obs.filter(o => (o.raLevel || '').toLowerCase().includes(r));
+  }
+  if (obsFilterState.status) {
+    const s = obsFilterState.status.toLowerCase();
+    obs = obs.filter(o => (o.status || '').toLowerCase().includes(s));
+  }
+  if (obsFilterState.search) {
+    const q = obsFilterState.search;
+    obs = obs.filter(o => {
       return (
-        String(o.location).toLowerCase().includes(q) ||
-        String(o.type).toLowerCase().includes(q) ||
-        String(o.reporter).toLowerCase().includes(q)
+        (o.area || '').toLowerCase().includes(q) ||
+        (o.type || '').toLowerCase().includes(q) ||
+        (o.obsClass || '').toLowerCase().includes(q) ||
+        (o.reporter || '').toLowerCase().includes(q) ||
+        (o.description || '').toLowerCase().includes(q)
       );
     });
   }
 
-  return list;
-}
-
-function renderObservationList() {
-  const listEl = document.getElementById("observationsList");
-  if (!listEl) return;
-  const tableExisting = document.querySelector(".obs-table");
-  if (tableExisting && tableExisting.parentElement === listEl) {
-    tableExisting.remove();
-  }
-
-  const filtered = applyObservationFilters();
-
-  if (!filtered.length) {
+  if (!obs.length) {
     listEl.innerHTML = `
-      <div class="obs-empty-state">
+      <div class="obs-empty">
         <i class="fas fa-info-circle"></i>
         <p>No observations match the selected filters.</p>
       </div>
     `;
+    updateObservationsSummary();
     return;
   }
 
-  // Desktop table
-  const table = document.createElement("table");
-  table.className = "obs-table";
-  table.innerHTML = `
-    <thead>
-      <tr>
-        <th>Date</th>
-        <th>Location</th>
-        <th>Type</th>
-        <th>Risk</th>
-        <th>Status</th>
-        <th>Reporter</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${filtered
-        .map(
-          o => `
-          <tr>
-            <td>${o.dateStr || ""}</td>
-            <td>${o.location || ""}</td>
-            <td>${o.type || ""}</td>
-            <td>${o.risk || ""}</td>
-            <td>${o.status || ""}</td>
-            <td>${o.reporter || ""}</td>
-          </tr>
-        `
-        )
-        .join("")}
-    </tbody>
-  `;
-  listEl.innerHTML = "";
-  listEl.appendChild(table);
+  const cardsHtml = obs.map(o => {
+    const risk = (o.raLevel || '').toLowerCase();
+    const status = (o.status || '').toLowerCase();
 
-  // Mobile cards
-  filtered.forEach(o => {
-    const card = document.createElement("div");
-    card.className = "obs-card";
+    // Stripe on left side of card (light theme colors set in CSS)
+    let cardRiskClass = 'risk-neutral';
+    if (risk.includes('high')) cardRiskClass = 'risk-high';
+    else if (risk.includes('medium')) cardRiskClass = 'risk-medium';
+    else if (risk.includes('low')) cardRiskClass = 'risk-low';
 
-    const riskLower = String(o.risk).toLowerCase();
-    let riskClass = "obs-badge-risk-low";
-    if (riskLower.includes("high")) riskClass = "obs-badge-risk-high";
-    else if (riskLower.includes("med")) riskClass = "obs-badge-risk-medium";
+    // Small pill badge for RA level
+    let badgeRiskClass = 'badge-neutral';
+    if (risk.includes('high')) badgeRiskClass = 'badge-high';
+    else if (risk.includes('medium')) badgeRiskClass = 'badge-medium';
+    else if (risk.includes('low')) badgeRiskClass = 'badge-low';
 
-    const statusLower = String(o.status).toLowerCase();
-    let statusClass = "obs-badge-status-open";
-    if (statusLower.includes("clos"))
-      statusClass = "obs-badge-status-closed";
-    else if (statusLower.includes("prog"))
-      statusClass = "obs-badge-status-inprogress";
+    let statusClass = 'status-other';
+    if (status.includes('open') || status.includes('progress')) statusClass = 'status-open';
+    if (status.includes('close')) statusClass = 'status-closed';
 
-    card.innerHTML = `
-      <div class="obs-card-header">
-        <div class="obs-card-title">${o.location || "No location"}</div>
-        <div>
-          <span class="obs-card-badge ${riskClass}">${o.risk || "N/A"}</span>
-          <span class="obs-card-badge ${statusClass}">${o.status || ""}</span>
+    const dateText = o.date
+      ? o.date.toLocaleDateString(undefined, {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        })
+      : (o.dateRaw || '');
+
+    return `
+      <article class="obs-card ${cardRiskClass}" data-obs-index="${o._index}">
+        <header class="obs-card-header">
+          <div class="obs-card-date">${dateText}</div>
+          <div class="obs-card-badges">
+            ${o.hasEvidence ? `
+              <span class="obs-evidence-chip" title="Evidence attached" aria-label="Evidence attached">
+                <i class="fas fa-image"></i>
+              </span>
+            ` : ''}
+            <span class="badge ${badgeRiskClass}">${o.raLevel || 'No RA'}</span>
+            <span class="status-pill ${statusClass}">${o.status || 'No status'}</span>
+          </div>
+        </header>
+        <div class="obs-card-body">
+          <div class="obs-main-line">
+            <span class="obs-type">${o.type || o.obsClass || 'Observation'}</span>
+            <span class="obs-area">${o.area || ''}</span>
+          </div>
+          <p class="obs-description">${o.description || ''}</p>
         </div>
-      </div>
-      <div class="obs-card-body">
-        <div><strong>Date:</strong> ${o.dateStr || ""}</div>
-        <div><strong>Type:</strong> ${o.type || ""}</div>
-      </div>
-      <div class="obs-card-footer">
-        <span><i class="fas fa-user"></i> ${o.reporter || "Unknown"}</span>
-      </div>
+        <footer class="obs-card-footer">
+          <span class="obs-reporter">
+            <i class="fas fa-users"></i>
+            ${o.group || o.reporter || 'Unknown group'}
+          </span>
+        </footer>
+      </article>
     `;
-    listEl.appendChild(card);
+  }).join('');
+
+  listEl.innerHTML = cardsHtml;
+  updateObservationsSummary();
+
+  // Click handler → open detail modal
+  const cards = Array.from(listEl.querySelectorAll('.obs-card'));
+  cards.forEach(card => {
+    card.addEventListener('click', () => {
+      const idxStr = card.getAttribute('data-obs-index');
+      if (!idxStr) return;
+      const idx = parseInt(idxStr, 10);
+      const obsItem = state.observations[idx];
+      if (obsItem) {
+        showObservationDetail(obsItem);
+      }
+    });
   });
 }
 
-// =========================
-//  NEWS
-// =========================
+function showObservationDetail(obs) {
+  const modal = $('#observationDetailModal');
+  const body = $('#observationDetailBody');
+  if (!modal || !body) return;
 
-function loadNews() {
-  const container = document.getElementById("AnnouncementsContainer");
-  const loading = document.getElementById("newsLoading");
-  if (!container) return;
+  const dateText = obs.date
+    ? obs.date.toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      })
+    : (obs.dateRaw || '');
 
-  if (!NEWS_CSV_URL || !NEWS_CSV_URL.startsWith("http")) {
-    if (loading) loading.remove();
-    container.innerHTML = `
-      <div class="obs-empty-state">
-        <i class="fas fa-exclamation-circle"></i>
-        <p>Configure NEWS_SHEET_CSV_URL in js/data.js to load news.</p>
+  // Helper for rows
+  const row = (label, value) => {
+    if (!value) return '';
+    return `
+      <div class="obs-detail-row">
+        <div class="obs-detail-label">${label}</div>
+        <div class="obs-detail-value">${value}</div>
       </div>
     `;
-    return;
+  };
+
+  // ---------- header pills (Code / RA / Status) ----------
+
+  // RA level class
+  const raText = (obs.raLevel || '').toLowerCase();
+  let raChipClass = 'obs-header-pill ra-neutral';
+  if (raText.includes('high')) raChipClass = 'obs-header-pill ra-high';
+  else if (raText.includes('medium')) raChipClass = 'obs-header-pill ra-medium';
+  else if (raText.includes('low')) raChipClass = 'obs-header-pill ra-low';
+
+  // Status class (Open = green, Closed = red)
+  const statusText = (obs.status || '').toLowerCase();
+  let statusChipClass = 'obs-header-pill status-other';
+  if (statusText.includes('open') || statusText.includes('progress')) {
+    statusChipClass = 'obs-header-pill status-open';
+  } else if (statusText.includes('close')) {
+    statusChipClass = 'obs-header-pill status-closed';
   }
 
-  fetch(NEWS_CSV_URL)
-    .then(res => res.text())
-    .then(text => {
-      if (loading) loading.remove();
-      const rows = parseCsv(text);
-      if (!rows.length) {
-        container.innerHTML = `
-          <div class="obs-empty-state">
-            <i class="fas fa-info-circle"></i>
-            <p>No news records found.</p>
-          </div>
+  // Observation Class – mark Negative in red
+  const obsClassValue = obs.obsClass || '';
+  const obsClassHtml = obsClassValue
+    ? `<span class="obs-class-value ${
+        /negative/i.test(obsClassValue) ? 'negative' : ''
+      }">${obsClassValue}</span>`
+    : '';
+
+  // Evidence section (Google Drive photos)
+  const evidenceLinks = Array.isArray(obs.evidenceLinks) && obs.evidenceLinks.length
+    ? obs.evidenceLinks
+    : (obs.evidenceUrl ? [obs.evidenceUrl] : []);
+
+  let evidenceSection = '';
+  if (evidenceLinks.length) {
+    const firstUrl = (evidenceLinks[0] || '').trim();
+    const thumbsHtml = evidenceLinks
+      .map((url, idx) => {
+        const safeUrl = (url || '').trim();
+        if (!safeUrl || !/^https?:\/\//i.test(safeUrl)) return '';
+        return `
+          <figure class="obs-evidence-image-wrapper">
+            <img
+              src="${safeUrl}"
+              alt="Observation evidence photo ${idx + 1}"
+              class="obs-evidence-image"
+              loading="lazy"
+            />
+            <figcaption class="obs-evidence-caption">Photo ${idx + 1}</figcaption>
+          </figure>
         `;
+      })
+      .join('');
+
+    if (firstUrl && thumbsHtml.trim()) {
+      evidenceSection = `
+        <section class="obs-detail-section">
+          <div class="obs-detail-section-title">Observation Evidence</div>
+          <div class="obs-evidence-box">
+            <a href="${firstUrl}" target="_blank" rel="noopener" class="obs-evidence-link">
+              <i class="fas fa-external-link-alt"></i>
+              Open all evidence in Google Drive
+            </a>
+            <div class="obs-evidence-images-grid">
+              ${thumbsHtml}
+            </div>
+            <p class="obs-evidence-hint">
+              If any image does not load, use the link above to open the file(s) directly in Google Drive.
+            </p>
+          </div>
+        </section>
+      `;
+    }
+  }
+
+  body.innerHTML = `
+    <div class="obs-detail-header-line">
+      <div class="obs-header-left">
+        ${obs.code ? `<span class="obs-header-pill code">Code: ${obs.code}</span>` : ''}
+      </div>
+      <div class="obs-header-right">
+        ${obs.raLevel ? `<span class="${raChipClass}">${obs.raLevel}</span>` : ''}
+        ${obs.status ? `<span class="${statusChipClass}">${obs.status}</span>` : ''}
+      </div>
+    </div>
+
+    <section class="obs-detail-section">
+      <div class="obs-detail-section-title">Overview</div>
+      <div class="obs-detail-grid">
+        ${row('Date', dateText)}
+        ${row('Day', obs.day)}
+        ${row('Area', obs.area)}
+        ${row('Activity Type', obs.type)}
+        ${row('Observation Class', obsClassHtml)}
+        ${row('Observation Types', obs.obsTypes)}
+      </div>
+    </section>
+
+    <section class="obs-detail-section">
+      <div class="obs-detail-section-title">Description</div>
+      <div class="obs-detail-description-box">
+        ${obs.description || 'No description provided.'}
+      </div>
+    </section>
+
+    ${evidenceSection}
+
+    <section class="obs-detail-section">
+      <div class="obs-detail-section-title">Person / Group</div>
+      <div class="obs-detail-grid">
+        ${row('Group / Reporter', obs.group || obs.reporter)}
+        ${row('Injury/No Injury', obs.injuryFlag)}
+        ${row('Type of Injury', obs.injuryType)}
+        ${row('ID', obs.id)}
+        ${row('Position', obs.position)}
+      </div>
+    </section>
+
+    <section class="obs-detail-section">
+      <div class="obs-detail-section-title">Causes &amp; Risk</div>
+      <div class="obs-detail-grid">
+        ${row('Direct Cause', obs.directCause)}
+        ${row('Root Cause', obs.rootCause)}
+        ${row('Equipment / Tool', obs.equipment)}
+        ${row('Likelihood', obs.likelihood)}
+        ${row('Severity', obs.severity)}
+        ${row('RA Rate', obs.raRate)}
+        ${row('RA Level', obs.raLevel)}
+        ${row('GI Number #', obs.giNumber)}
+        ${row('Comments', obs.comments)}
+      </div>
+    </section>
+  `;
+
+  modal.classList.add('show');
+}
+
+function hideObservationDetailModal() {
+  const modal = $('#observationDetailModal');
+  if (modal) modal.classList.remove('show');
+}
+
+window.showObservationDetail = showObservationDetail;
+window.hideObservationDetailModal = hideObservationDetailModal;
+
+
+  // -------------------- News --------------------
+
+// -------------------- News --------------------
+
+  // -------------------- News --------------------
+
+// -------------------- News --------------------
+
+  async function loadNews() {
+    const url = window.NEWS_SHEET_CSV_URL;
+    const container = $('#AnnouncementsContainer');
+    const loading = $('#newsLoading');
+
+    if (!container) return;
+
+    if (!url) {
+      container.innerHTML =
+        '<p class="text-muted">Configure NEWS_SHEET_CSV_URL in js/data.js to load news.</p>';
+      return;
+    }
+
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const text = await res.text();
+      const rows = parseCSV(text);
+      if (!rows.length) throw new Error('Empty sheet');
+
+      const headers = rows[0];
+      const body = rows.slice(1).filter(r => r.some(c => c && c.trim() !== ''));
+
+      const idxDate = findColumnIndex(headers, ['Date']);
+      const idxTitle = findColumnIndex(headers, ['Title', 'Subject']);
+      const idxContent = findColumnIndex(headers, ['Description', 'Content', 'Details', 'Body']);
+
+      if (loading) loading.style.display = 'none';
+
+      if (!body.length) {
+        container.innerHTML = '<p class="text-muted">No news found.</p>';
         return;
       }
 
-      const cards = rows
-        .map(row => {
-          const title = row.Title || row.Subject || "Announcement";
-          const body = row.Body || row.Message || row.Description || "";
-          const date = row.Date || "";
-          const pinned = (row.Pinned || "").toLowerCase() === "yes";
-          const category = row.Category || "";
-          const badge = category
-            ? `<span style="font-size:11px; padding:3px 7px; border-radius:999px; background-color:rgba(23,162,184,0.12); color:#17a2b8; margin-left:6px;">${category}</span>`
-            : "";
+      // Build cards
+      container.innerHTML = body.map(row => {
+        const d = idxDate !== -1 ? (row[idxDate] || '') : '';
+        const t = idxTitle !== -1 ? (row[idxTitle] || '') : 'No Title';
+        let c = idxContent !== -1 ? (row[idxContent] || '') : '';
 
-          return `
-          <div class="announcement-card" data-pinned="${pinned ? "true" : "false"}">
-            <div class="card-title">
-              <span>
-                <i class="fas fa-bullhorn"></i> ${title}
-                ${badge}
-              </span>
-              <span class="toggle-icon"><i class="fas fa-chevron-down"></i></span>
+        // Normalise "empty" content
+        const raw = (c || '').trim();
+        const hasRealDetails = raw && raw.toLowerCase() !== 'no details';
+
+        if (!hasRealDetails) {
+          c = 'No details.'; // what you saw before
+        }
+
+        const cardClasses = ['announcement-card'];
+        if (!hasRealDetails) cardClasses.push('no-details');
+
+        return `
+          <div class="${cardClasses.join(' ')}">
+            <div class="card-date">${d}</div>
+            <div class="card-title${hasRealDetails ? ' clickable' : ''}">
+              ${t}
+              ${hasRealDetails ? '<i class="fas fa-chevron-down toggle-icon"></i>' : ''}
             </div>
-            ${date ? `<div class="card-date">${date}</div>` : ""}
-            <div class="card-content">
-              ${body.replace(/\n/g, "<br>")}
-            </div>
+            <div class="card-content">${c}</div>
           </div>
         `;
-        })
-        .join("");
+      }).join('');
 
-      container.innerHTML = cards;
+      // Attach click handlers (only when there are real details)
+      $all('.announcement-card').forEach(card => {
+        const titleEl = card.querySelector('.card-title.clickable');
+        const contentEl = card.querySelector('.card-content');
+        const icon = card.querySelector('.toggle-icon');
 
-      const allCards = Array.from(
-        container.querySelectorAll(".announcement-card")
-      );
-      const pinnedCards = allCards.filter(
-        c => c.getAttribute("data-pinned") === "true"
-      );
-      if (pinnedCards.length) {
-        const wrapper = document.createElement("div");
-        wrapper.innerHTML = `
-          <h3 style="font-family:'Poppins',sans-serif; font-size:14px; margin:6px 4px;">🔝 Important Now</h3>
-        `;
-        pinnedCards.forEach(c => wrapper.appendChild(c));
-        container.prepend(wrapper);
-      }
+        if (!titleEl || !contentEl) return;
 
-      container.querySelectorAll(".announcement-card").forEach(card => {
-        const titleDiv = card.querySelector(".card-title");
-        const content = card.querySelector(".card-content");
-        if (!titleDiv || !content) return;
-        content.style.display = "none";
-        titleDiv.addEventListener("click", () => {
-          const isOpen = content.style.display === "block";
-          content.style.display = isOpen ? "none" : "block";
-          const icon = titleDiv.querySelector(".toggle-icon i");
-          if (icon) {
-            icon.classList.toggle("fa-chevron-down", isOpen);
-            icon.classList.toggle("fa-chevron-up", !isOpen);
-          }
+        // start collapsed
+        card.classList.remove('open');
+        contentEl.style.display = 'none';
+
+        titleEl.addEventListener('click', () => {
+          const isOpen = card.classList.toggle('open');
+          contentEl.style.display = isOpen ? 'block' : 'none';
+          if (icon) icon.classList.toggle('rotated', isOpen);
         });
       });
-    })
-    .catch(err => {
-      console.error("News load error:", err);
-      if (loading) loading.remove();
+    } catch (err) {
+      console.error('News load error:', err);
+      if (loading) loading.style.display = 'none';
       container.innerHTML = `
-        <div class="obs-empty-state">
-          <i class="fas fa-exclamation-circle"></i>
-          <p>Failed to fetch news from the sheet.</p>
+        <div class="announcement-card no-details">
+          <div class="card-date">Error</div>
+          <div class="card-title">Failed to fetch news</div>
+          <div class="card-content">
+            Check the <strong>NEWS_SHEET_CSV_URL</strong> in js/data.js or your network connection.
+          </div>
         </div>
       `;
-    });
-}
-
-// =========================
-//  GPS LOCATION
-// =========================
-
-function getGPSLocation() {
-  const resEl = document.getElementById("locationResult");
-  if (!navigator.geolocation) {
-    if (resEl) resEl.textContent = "Geolocation is not supported.";
-    return;
-  }
-  if (resEl) {
-    resEl.textContent = "Locating...";
-  }
-  navigator.geolocation.getCurrentPosition(
-    pos => {
-      const { latitude, longitude } = pos.coords;
-      const link = `https://www.google.com/maps?q=${latitude},${longitude}`;
-      if (resEl) {
-        resEl.innerHTML = `
-          <strong>Location captured:</strong><br>
-          Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)}<br>
-          <a href="${link}" target="_blank">Open in Google Maps</a>
-        `;
-      }
-    },
-    err => {
-      console.error("GPS error:", err);
-      if (resEl) resEl.textContent = "Unable to get location.";
     }
-  );
+  }
+
+
+  // -------------------- Tasks iframe (lazy load) --------------------
+
+ let tasksIframeInitialized = false;
+
+function initTasksIframe() {
+  if (tasksIframeInitialized) return;
+  const iframe = $('#tasksIframe');
+  if (!iframe) return;
+
+  // First choice: use the configured Google Form URL
+  if (window.TASKS_FORM_EMBED_URL) {
+    iframe.src = window.TASKS_FORM_EMBED_URL;
+  }
+  // Fallback: if you ever set data-src in HTML
+  else if (iframe.dataset && iframe.dataset.src) {
+    iframe.src = iframe.dataset.src;
+  }
+
+  tasksIframeInitialized = true;
 }
 
-// =========================
-//  INIT
-// =========================
+  // -------------------- Floating Add Observation button --------------------
 
-document.addEventListener("DOMContentLoaded", () => {
-  // 1) Read all config from data.js
-  initConfigFromWindow();
-
-  // 2) Apply saved theme
-  applySavedTheme();
-
-  // 3) Ensure Home tab marked active
-  const defaultTabBtn = document.querySelector(
-    '.nav-button[data-color][onclick*="HomeTab"]'
-  );
-  if (defaultTabBtn) {
-    defaultTabBtn.classList.add("active");
-    defaultTabBtn.setAttribute("aria-selected", "true");
+  function setupAddObservationButton() {
+    const btn = $('#addObservationButton');
+    if (!btn) return;
+    // URL comes from js/data.js (ADD_OBSERVATION_FORM_URL), but we also
+    // left a fallback href in HTML. Here we just ensure it matches.
+    if (window.ADD_OBSERVATION_FORM_URL) {
+      btn.href = window.ADD_OBSERVATION_FORM_URL;
+    }
   }
 
-  // 4) Proper iframe & button URLs (override placeholder in HTML)
-  const tasksIframe = document.getElementById("tasksIframe");
-  if (tasksIframe && TASKS_URL) {
-    tasksIframe.src = TASKS_URL;
-  }
-  const addObsBtn = document.getElementById("addObservationButton");
-  if (addObsBtn && ADD_OBS_URL) {
-    addObsBtn.href = ADD_OBS_URL;
-  }
+  // -------------------- Init app --------------------
 
-  // 5) Month color
-  setMonthColor();
+  function initApp() {
+setupDarkMode();
+    setupNav();
+    setupAccordions();
+    setupModals();
+    setupAddObservationButton();
+    setupTbtOfDay();
+    setupTbtLibrary();
+    setupJsaLibrary();
+    setupCsmLibrary();
+setupLibrarySwitcher();   // 👈 NEW
+    setupTools();
+    loadEomAndLeaderboard();
+    loadObservations();
+    loadNews();
 
-  // 6) Accordions
-  initAccordions();
 
-  // 7) EOM + leaderboard
-  loadEomAndLeaderboard();
-
-  // 8) TBT
-  renderTbtOfTheDay();
-  renderTbtLibrary();
-
-  // 9) JSA
-  renderJSAList();
-  const jsaSearch = document.getElementById("jsaSearch");
-  if (jsaSearch) {
-    jsaSearch.addEventListener("input", filterJSAList);
+    // If we already have summaries from tools, reflect in Home
+    const homeHeat = $('#homeHeatSummary');
+    const homeWind = $('#homeWindSummary');
+    if (homeHeat && state.lastHeatSummary) homeHeat.textContent = state.lastHeatSummary;
+    if (homeWind && state.lastWindSummary) homeWind.textContent = state.lastWindSummary;
   }
 
-  // 10) KPIs
-  renderKPIs();
+  document.addEventListener('DOMContentLoaded', initApp);
+})();
+// =========================================
+// Central configuration & data for the safety app
+// All URLs & safety libraries live here so app.js
+// can focus on logic + UI.
+// =========================================
 
-  // 11) Tools default
-  switchTool("kpi");
+// ========== GOOGLE FORMS (EMBEDS & LINKS) ==========
 
-  // 12) Observations
-  initObservationFiltersUI();
-  loadObservations();
+// Daily tasks / checklist form (embedded in Tasks tab)
+window.TASKS_FORM_EMBED_URL =
+  'https://docs.google.com/forms/d/e/1FAIpQLSezm0wWTdEsvkIdnzhfpRf0G37tZzqbY-AF-BHfbXXiLr2rKA/viewform?embedded=true';
 
-  // 13) News
-  loadNews();
+// Add new observation form (used by floating green button)
+window.ADD_OBSERVATION_FORM_URL =
+  'https://docs.google.com/forms/d/e/1FAIpQLSfYED_4UfHcmWn0fQOjtR5s8A0-Bhr4dwpe-80GjKkLeTR_Lw/viewform?usp=header';
+
+// ========== GOOGLE SHEETS (CSV & VIEW LINKS) ==========
+
+// Employee of the Month + Leaderboard sheet (CSV)
+window.EOM_SHEET_URL =
+  'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0Km9p6XYDDxyGYSFfUjDjhdKMtr_hFvCiJ-U5_24_-QKrGsexZ4v3dxzKp0K1XZenNsiV7CiNmQEt/pub?output=csv';
+
+// Observations main data sheet (CSV)
+window.OBSERVATIONS_SHEET_CSV_URL =
+  'https://docs.google.com/spreadsheets/d/e/2PACX-1vTXlN-sE-IkQJLMaVOvRGSBYNLsDvwZTD15w7rarTIXBGoacF0C5_eiI7OmFs__zA8jtlwhy0ULLZ8N/pub?output=csv';
+
+// News / Announcements sheet (CSV)
+window.NEWS_SHEET_CSV_URL =
+  'https://docs.google.com/spreadsheets/d/1_SwxL5f4mWF5kd2yofCMCEE_WQp_2eroHDhXXPXtw1U/export?format=csv&gid=0';
+
+// Full observations HTML sheet (opened when user taps
+// "Open full data sheet" button in Observations tab)
+window.OBSERVATIONS_FULL_SHEET_URL =
+  'https://docs.google.com/spreadsheets/d/e/2PACX-1vTXlN-sE-IkQJLMaVOvRGSBYNLsDvwZTD15w7rarTIXBGoacF0C5_eiI7OmFs__zA8jtlwhy0ULLZ8N/pubhtml';
+
+// Optional default color code of the month (used as
+// fallback if EOM sheet has no value for this month)
+window.DEFAULT_MONTH_COLOR_NAME = 'White';
+
+// =========================================
+// TBT LIBRARY
+// =========================================
+//
+// Each item: { title: "TBT Title", link: "Google Drive link" }
+
+window.tbtData = [
+  { title: "Alcohol and Drugs", link: "https://drive.google.com/file/d/1uIGAjyY2UuxdkWToEGqMoF-L1Q9cIn5c/view?usp=drivesdk" },
+  { title: "Biohazard infection materials", link: "https://drive.google.com/file/d/1wUY8mlaEXOroUK5IoPPbBpym97Jdjfm4/view?usp=drivesdk" },
+  { title: "Cold Weather", link: "https://drive.google.com/file/d/1QOp3TVAb-si19p-taHpPjSwEfXs1O5us/view?usp=drivesdk" },
+  { title: "Compressed Gas", link: "https://drive.google.com/file/d/1a7tLsOI7Re7QAWDivisUFdakbvpSEYOt/view?usp=drivesdk" },
+  { title: "Confined Space", link: "https://drive.google.com/file/d/1HXssVREKX0mq0Orn-gU3oqaLfDgEY2j1/view?usp=drivesdk" },
+  { title: "Construction Fires", link: "https://drive.google.com/file/d/1nXBiIuAEjs4om2NwASqfyhtT-8IUBpGt/view?usp=drivesdk" },
+  { title: "Corrosive Materials", link: "https://drive.google.com/file/d/1VaFxPYhYt0Ho8blbkGQi2S4ubsT882ge/view?usp=drivesdk" },
+  { title: "Dangerously reactive material", link: "https://drive.google.com/file/d/16CNFN5iuf3YFyVW-tYNVQgHkRu8z8deg/view?usp=drivesdk" },
+  { title: "Dial before you Dig", link: "https://drive.google.com/file/d/1YlWyaHh2lPoum-OYYoJ2qP8t948qwZLI/view?usp=drivesdk" },
+  { title: "Driving in Reverse", link: "https://drive.google.com/file/d/1QzLSWz3CFfjGdmj62OsFdvT5IcV_lrqJ/view?usp=drivesdk" },
+  { title: " Emergency Response", link: "https://drive.google.com/file/d/1bWiXimPy6SmqbtEs5LxJE9zvS765GSzN/view?usp=drivesdk" },
+  { title: " Equipment Guards", link: "https://drive.google.com/file/d/1i4o3HHM6O2EPJ1hf-2IQ97_AREDCMIDr/view?usp=drivesdk" },
+  { title: " Exercise and Health", link: "https://drive.google.com/file/d/13pnUXqSmGNuXHAGKG7TyKhwryEWbtAaO/view?usp=drivesdk" },
+  { title: " Eye Protection", link: "https://drive.google.com/file/d/13HufH-DcwH-P-pEZZKTUNzHSo2lzyzLa/view?usp=drivesdk" },
+  { title: " Fall Protection", link: "https://drive.google.com/file/d/1I_MQHppz0KnwIgiTiLwpLUPyd0N-z1c_/view?usp=drivesdk" },
+  { title: " Fatigue", link: "https://drive.google.com/file/d/1jidO7NprdqLowWkXEXKtWBPBq5iwI9yA/view?usp=drivesdk" },
+  { title: " Flammable and Combustible Materials", link: "https://drive.google.com/file/d/1Gcbe3miY43cJYkW6a7sTO7mbC8m31ICL/view?usp=drivesdk" },
+  { title: " Foot Protection", link: "https://drive.google.com/file/d/1aQJxutEcqL2H_mcnSBK9uuj2silzAyRl/view?usp=drivesdk" },
+  { title: " Grinders Naloxia", link: "https://drive.google.com/file/d/1jJqncsuUSmrF2dPlqlLz28jRN73H-RBe/view?usp=drivesdk" },
+  { title: " Hand Protection", link: "https://drive.google.com/file/d/1LOiKyFoMb3dsR_pYyJECJLxCMFpEhpFT/view?usp=drivesdk" },
+  { title: " Hazardouse Waste", link: "https://drive.google.com/file/d/1pLR9ewUgc0Memjx3BLiOnSW-4MWf7IKe/view?usp=drivesdk" },
+  { title: " Head Protection", link: "https://drive.google.com/file/d/1BlmB3NNKNldC0xMH-c_j-KqlmDva_loF/view?usp=drivesdk" },
+  { title: " Hearing", link: "https://drive.google.com/file/d/191qRYe-ZVNfcSGHBtm6TLK4rVAOFtKTh/view?usp=drivesdk" },
+  { title: " Hot Weather", link: "https://drive.google.com/file/d/1to9Fzdpv5bu3GQm98prLzFSjpuHAmuUh/view?usp=drivesdk" },
+  { title: " Housekeeping", link: "https://drive.google.com/file/d/1iTMdIu08H0H-0S03mxMrlawHSWhjEf-c/view?usp=drivesdk" },
+  { title: " Inspection of tools", link: "https://drive.google.com/file/d/1kNXJxumw42uQe1eGdBLZ-KlKEoI_ctF6/view?usp=drivesdk" },
+  { title: "Ladder Safety", link: "https://drive.google.com/file/d/1KO_-SERnB-IE68KL-cmxxG6dVkFVERUq/view?usp=drivesdk" },
+  { title: " Lock out", link: "https://drive.google.com/file/d/1AhXs6ej3cDXk5gAIQAt09ySwAtZV7dn8/view?usp=drivesdk" },
+  { title: " Material Safety Data Sheet", link: "https://drive.google.com/file/d/1hpf53QlwxLDp0VZC6F5TBZ1NTZuId6Gp/view?usp=drivesdk" },
+  { title: " Oxidizing Materials", link: "https://drive.google.com/file/d/10dBlB83VwTiGtbN5RteXckS7rbmUaekS/view?usp=drivesdk" },
+  { title: " Personal Protectuve Equipment", link: "https://drive.google.com/file/d/1IfAiA0mVIrLEGIxip-YhrhFyLhGCC0Yk/view?usp=drivesdk" },
+  { title: " Pinch Points and Blinds", link: "https://drive.google.com/file/d/1fFNrba9aIgQxXcbiaLnjb5FqHsKTGjPG/view?usp=drivesdk" },
+  { title: " Poisonous and Infectious Materials", link: "https://drive.google.com/file/d/1g1hsd8OIgPt6njOeSNozajuAiVJNKMlX/view?usp=drivesdk" },
+  { title: " Power Lines", link: "https://drive.google.com/file/d/1Sqlm3-z9cZ6RaOFqVPL-A4sZ1pnxDxLD/view?usp=drivesdk" },
+  { title: " Power Saws", link: "https://drive.google.com/file/d/1WiTJbh7uaGCTwzUHo5EUMa6vYl-hzMBj/view?usp=drivesdk" },
+  { title: " Proper Lifting and Back Care", link: "https://drive.google.com/file/d/10EutgMs_0XH_VJvF2_vIYcQRIlPQtN_4/view?usp=drivesdk" },
+  { title: " Reporting Accedints", link: "https://drive.google.com/file/d/1AoADCkqOQxoWMIkQkNa2S71FzZzra4s6/view?usp=drivesdk" },
+  { title: " Reporting Near Miss and incident ", link: "https://drive.google.com/file/d/1W5yhuJrbdaO27S2B-TnPbTVVKkCSnIFG/view?usp=drivesdk" },
+  { title: " Respiratory Protective", link: "https://drive.google.com/file/d/1QX86Iu4RJj5bvdzWdJgtKAy8-LIRR8x7/view?usp=drivesdk" },
+  { title: " Roofing", link: "https://drive.google.com/file/d/17INX1mFhwxHsxyM8A6Vbd98jywHDFN08/view?usp=drivesdk" },
+  { title: " Scaffold Safety", link: "https://drive.google.com/file/d/1BPzGrFJMuA9eDl46zhh7iQqMYqqnMwLS/view?usp=drivesdk" },
+  { title: " Signs", link: "https://drive.google.com/file/d/1RfT2WDhQnOW_8FTv2t80UfhXO14uEmxJ/view?usp=drivesdk" },
+  { title: " Slips and Trips", link: "https://drive.google.com/file/d/11QSqSs0SWcXHjzNQMrjDtumrKtM5Wp0u/view?usp=drivesdk" },
+  { title: " Stretching", link: "https://drive.google.com/file/d/1dD54piQQtbjhhw3u_4bCLSfjp9cd5Jtr/view?usp=drivesdk" },
+  { title: " Traffic Control People", link: "https://drive.google.com/file/d/1aLbvfU2E4OpsYv4UkjTa4Y6QEupxDwPI/view?usp=drivesdk" },
+  { title: " Transportion of Goods", link: "https://drive.google.com/file/d/1rbuTSg_MTsr_gwxGNWAyyPeBvZpNOGHL/view?usp=drivesdk" },
+  { title: " Safe Trenching and Excavating", link: "https://drive.google.com/file/d/1CKOVtAR5iGz0PVQz51adhC6ZXjtEJgV_/view?usp=drivesdk" },
+  { title: " Working Around Mobile Equipment", link: "https://drive.google.com/file/d/14SncgzRAVHd8-kJNGmZVroYuS42TshEr/view?usp=drivesdk" },
+  { title: " Working With Hazardous Materials ", link: "https://drive.google.com/file/d/1gYF6cUISYjUZF_pLEKadmPbe49YM2_ph/view?usp=drivesdk" },
+];
+
+// =========================================
+// JSA LIBRARY
+// =========================================
+//
+// Each item: { title: "JSA Title", link: "Google Drive link" }
+
+window.jsaData = [
+  { title: "Abrasive Blasting And Coating", link: "https://drive.google.com/file/d/1tZBj37GGJ7h9uRYDI5TIL04OkNrEMoLu/view?usp=drivesdk" },
+  { title: "Backfilling Levelling And Compaction", link: "https://drive.google.com/file/d/1I32miHCfXBzETNx5UePxwHY4f9Fi-Fd1/view?usp=drivesdk" },
+  { title: "Backfilling Levelling And Compaction Around Concrete Guards", link: "https://drive.google.com/file/d/1Fiei1faeqkuNCxR_-FMOlBF66w1ELC-0/view?usp=drivesdk" },
+  { title: "Bolt Tightening And Torquing Activity", link: "https://drive.google.com/file/d/1iEyD5UObnaZ0TppEgmsAI-I0ELKYzdik/view?usp=drivesdk" },
+  { title: "Cable Laying in Electrical Manhole", link: "https://drive.google.com/file/d/1Wp8i107zfvQfBgmo3w87FicqkbJ-YlzX/view?usp=drivesdk" },
+  { title: "Checking Lifting Cables", link: "https://drive.google.com/file/d/1HTuLhegqg63HDC0g4LYLHRZvvsvKlgMj/view?usp=drivesdk" },
+  { title: "Civil Work for HDD Road Crossing and Survey Works", link: "https://drive.google.com/file/d/1ZCt-ymqSm538XKifw7IGveIgSBklV-FM/view?usp=drivesdk" },
+  { title: "Coating and Painting", link: "https://drive.google.com/file/d/11Hvb1voK2OvES76nYruhbkI00OZIa2bO/view?usp=drivesdk" },
+  { title: "Cold Cutting Activity", link: "https://drive.google.com/file/d/1w8dkyJ4_KdrXhMvBKffpSmWLvGYRD_PS/view?usp=drivesdk" },
+  { title: "Conductor and MLDT Installation", link: "https://drive.google.com/file/d/1DrsTymUDKM_g_vQ3Cp80mW9iyM6G4Wmx/view?usp=drivesdk" },
+  { title: "Concrete Cutting and Demolition", link: "https://drive.google.com/file/d/13rKL8nwFYmPC-gMMHhpgmW-Ht-gTgbFa/view?usp=drivesdk" },
+  { title: "Concrete Pouring Work", link: "https://drive.google.com/file/d/1jBzQEzvUibCXixT_OBMKHXwS35KKYdlC/view?usp=drivesdk" },
+  { title: "Conduit And Drain Pipe Installation", link: "https://drive.google.com/file/d/1DkYftrZ9soByBRmZtmkA6iFm8wvTu3CT/view?usp=drivesdk" },
+  { title: "Culvert Installation Activities", link: "https://drive.google.com/file/d/1H1_apctHNyH1f_k18oaXZXVj78W0bdZs/view?usp=drivesdk" },
+  { title: "Cutting and Bevelling Work", link: "https://drive.google.com/file/d/1SGg1kNsHSxEH0LJcitBFDDCRglfGbNnI/view?usp=drivesdk" },
+  { title: "Driving Off Road", link: "https://drive.google.com/file/d/1F0_hFnmHPdAmEzAgCbgUTpzxSWjAtRoI/view?usp=drivesdk" },
+  { title: "Duct Bank and Marker Installation", link: "https://drive.google.com/file/d/1n819UkZXVgKGB_-8xSz0T8tSCxd2G9pg/view?usp=drivesdk" },
+  { title: "E & I Calibrations and Instrument Testing", link: "https://drive.google.com/file/d/1tZvf-B8gJbQUoKdsjkCYmZPJq8LXS_Oq/view?usp=drivesdk" },
+  { title: "E & I Cable Laying and Termination Activities", link: "https://drive.google.com/file/d/1Q06KpF1_psWnnAQ_52MJjnrFQoxRn2Eq/view?usp=drivesdk" },
+  { title: "E & I Installation Activities", link: "https://drive.google.com/file/d/1N7uxi_5adFadC0uYfC92k7m9lLkQRsI9/view?usp=drivesdk" },
+  { title: "E & I Installation Inside Substation", link: "https://drive.google.com/file/d/1FObIYqXr49dSXvK7mUbR_HdrqKvBruGw/view?usp=drivesdk" },
+  { title: "Electro Mechanical QA QC Activities", link: "https://drive.google.com/file/d/1hIJPnTAQ5FU6ku6iZ2er3SvB3IU-7qxB/view?usp=drivesdk" },
+  { title: "Equipment Pre commissioning", link: "https://drive.google.com/file/d/1cX3uHpn4RUZHicjnabgxgcV5bgHqUqf0/view?usp=drivesdk" },
+  { title: "Excavation And Trenching Activities", link: "https://drive.google.com/file/d/1G3ewcaKqsKsK7kIpRi7ErZ5UuFmSQQo2/view?usp=drivesdk" },
+  { title: "Fabrication and Erection of Steel Structure", link: "https://drive.google.com/file/d/1euR77zoBmj1yfJXt2qgLUa4uIvmM75TU/view?usp=drivesdk" },
+  { title: "Field Joint Coating Activities", link: "https://drive.google.com/file/d/1y31FL8RQehGLE977fqIrGIqJKdP5_MzA/view?usp=drivesdk" },
+  { title: "Flare KO Drum Installation Activities", link: "https://drive.google.com/file/d/16d3e27BHovQUgatctfDpCjuTCmLxivlO/view?usp=drivesdk" },
+  { title: "Hand Excavation", link: "https://drive.google.com/file/d/1x0Lao8Pgyz-nuBwajEhM--XKN-wAzVKZ/view?usp=drivesdk" },
+  { title: "Hand Excavation and Excavation Around Existing Facilities", link: "https://drive.google.com/file/d/1w1YUqFPVW2n0kfrxGb9QrEXvB6dA2uoY/view?usp=drivesdk" },
+  { title: "Handling and Loading of Heavy Equipment Onto Low Bed Trailer", link: "https://drive.google.com/file/d/1tHMeXuDF_arQ5mdUsCYFJ56tTn9fKe8N/view?usp=drivesdk" },
+  { title: "Heavy Equipment Movement", link: "https://drive.google.com/file/d/1-yoZFdAYQ2MZ4caqon3qSr7nqi3HbdAj/view?usp=drivesdk" },
+  { title: "Heavy Equipment Operation", link: "https://drive.google.com/file/d/1FgI8uQUibNo1sWZTuyLD-xAxulS7VXaM/view?usp=drivesdk" },
+  { title: "Heavy Equipment Operation and Manoeuvring in Work Site", link: "https://drive.google.com/file/d/1NDCoBZy-ayELHILwPgGD_sSz69Wo_AUS/view?usp=drivesdk" },
+  { title: "Heavy Equipment Pre Moblisation", link: "https://drive.google.com/file/d/1sHt503_Kd3iBdkO0YB-BVGK2Ks0WJ4mT/view?usp=drivesdk" },
+  { title: "Heavy Equipment Pre Mobilisation", link: "https://drive.google.com/file/d/1pB-AyExXgstZKyz8_wkowB_kWAUfBDbi/view?usp=drivesdk" },
+  { title: "Heavy Vehicle Driving", link: "https://drive.google.com/file/d/151Q44VXIvTXh1xyYIm94sHN6IIessdle/view?usp=drivesdk" },
+  { title: "Heavy Vehicle Movement inside Refinery", link: "https://drive.google.com/file/d/1hzCw1qzOr23pOEfRPhyiRUzs1Jhl5pHV/view?usp=drivesdk" },
+  { title: "Heavy Vehicle Operation", link: "https://drive.google.com/file/d/18ocXGqE6DeXfne-4wtZne56-gI4z2s8U/view?usp=drivesdk" },
+  { title: "Holiday and Defect Repair Activities", link: "https://drive.google.com/file/d/1o-Q_n8EI7dWIPzQ0QD8LfSyVDamZSrwH/view?usp=drivesdk" },
+  { title: "Hot Tapping Activities", link: "https://drive.google.com/file/d/1fw5O9cFYtJ39uyX-ggTNHYODHHeCsZ0z/view?usp=drivesdk" },
+  { title: "Hot Work Inside Refinery", link: "https://drive.google.com/file/d/1WRi44gyMgYrPplrW7xKmtSd2mm5sr8S7/view?usp=drivesdk" },
+  { title: "Hot Work with Cold Cutting Activities", link: "https://drive.google.com/file/d/1l3GUHqLDi3H_gwLyputynWJwMQ37g6qx/view?usp=drivesdk" },
+  { title: "Housekeeping Activities", link: "https://drive.google.com/file/d/1C8YqNAkt6xGh7lqG51WivOGsyR3OullG/view?usp=drivesdk" },
+  { title: "Hydrotesting of Pipe Line", link: "https://drive.google.com/file/d/1_aQ8-UiNhlv6rcMFf98KcEEGs5ARH2vV/view?usp=drivesdk" },
+  { title: "Installation of Cable Tray and Ladder", link: "https://drive.google.com/file/d/1uKNobEawMyCUN-DuhktF7TqN7bW5nKbu/view?usp=drivesdk" },
+  { title: "Installation of Control Valve,  PSV, MOV, Blind Blind Flange and Vent Valve", link: "https://drive.google.com/file/d/1hc_32uUlTOZYw93kB7GvTaylor/view?usp=drivesdk" },
+  { title: "Installation of Electrical Panel and Switchgear", link: "https://drive.google.com/file/d/1qvrydnktRL-HpmJ8Gn0czpWMEitnRrH_/view?usp=drivesdk" },
+  { title: "Installation of Fence and Gates", link: "https://drive.google.com/file/d/1aSUh2xIfxV29R0hIJrKbqG4U6ZlQKp0I/view?usp=drivesdk" },
+  { title: "Installation of Fire Water Facility", link: "https://drive.google.com/file/d/1uKG2pcIP-BPcXc-EDjvFb5afpRLEaQgs/view?usp=drivesdk" },
+  { title: "Installation of Flare Stack Foundation", link: "https://drive.google.com/file/d/1TXa6CQf5AFE_YrRFpv_b2G7nlILCYay4/view?usp=drivesdk" },
+  { title: "Installation of Pipe Rack and Piping", link: "https://drive.google.com/file/d/1_rjTyict8TdTQMS0sRs5sH3CHfDIlbbA/view?usp=drivesdk" },
+  { title: "Installation of Piping on Sleepers", link: "https://drive.google.com/file/d/1cJb0pd7FBeZm9uhRkfgKWcFa1QgGnPIW/view?usp=drivesdk" },
+  { title: "Installation of Pneumatic and Hydraulic Tubing", link: "https://drive.google.com/file/d/1MPiCD2x8c2mNw-fWHM4AtbKJK-YuPQiz/view?usp=drivesdk" },
+  { title: "Installation of Process Vessel and Drum", link: "https://drive.google.com/file/d/1d0C5PdgVld6V9UhxqNz70dKkTWNyNjc5/view?usp=drivesdk" },
+  { title: "Installation of Pumps", link: "https://drive.google.com/file/d/1XrXF9QQWSWku0Srl2L_PVQINGNPL9Ldr/view?usp=drivesdk" },
+  { title: "Installation of Rigid and Flexible Pavement", link: "https://drive.google.com/file/d/1OGKyNVgw0_DTFUWxyV7oQXtTaCNJ3d18/view?usp=drivesdk" },
+  { title: "Installation of Steel Structure", link: "https://drive.google.com/file/d/13G0U5DsfgvCaVxPCDb6VK3jGKJzq2k3l/view?usp=drivesdk" },
+  { title: "Installation of Structural Foundations", link: "https://drive.google.com/file/d/1tbN7i0_8SJ1gsCwO6v5LyOzJVXFZNR5a/view?usp=drivesdk" },
+  { title: "Installation of Valve and Spectacle Blind", link: "https://drive.google.com/file/d/1pvcFZz3uL8RqIOvk4u7QYlX0dbcdRFSw/view?usp=drivesdk" },
+  { title: "Loading and Unloading of Material", link: "https://drive.google.com/file/d/1X1y8uFvhlZz-oN3rZ4HeaZ3b5XHMiDC7/view?usp=drivesdk" },
+  { title: "Manual Handling Activities", link: "https://drive.google.com/file/d/1YG5MBO06LH9xvKfGda6uH_jJkmB8J5tZ/view?usp=drivesdk" },
+  { title: "Operation of Crane", link: "https://drive.google.com/file/d/1uRgWkF0IDSChVffa8593v5-hMxhCRplQ/view?usp=drivesdk" },
+  { title: "Operation of MEWP", link: "https://drive.google.com/file/d/1G3wKCUw0bL4PWi7GC1C3_OYJ3KpJTLID/view?usp=drivesdk" },
+  { title: "Operation of Side Boom", link: "https://drive.google.com/file/d/1k9XShTrx72jVh41RvB6O2EGHGCskkZt7/view?usp=drivesdk" },
+  { title: "Pneumatic Hydrotesting of Pipe", link: "https://drive.google.com/file/d/1pzKiw_gXf7pBDMkpfJFhWIPs0TM2VYv7/view?usp=drivesdk" },
+  { title: "Pre Commissioning Activities", link: "https://drive.google.com/file/d/1p43MDV3Udpz4kpThFue3rKOqLQ7cOv1u/view?usp=drivesdk" },
+  { title: "Radiography Testing Activities", link: "https://drive.google.com/file/d/1dPUuxlB-UWw6bK5QN3DoZRi9Ku_3qgXK/view?usp=drivesdk" },
+  { title: "Reinstatement and Backfilling Activities", link: "https://drive.google.com/file/d/1rVid9aLGgbSj_sOcnpOMhUtLHD0AxwCj/view?usp=drivesdk" },
+  { title: "Road Crossing and Culvert Construction", link: "https://drive.google.com/file/d/1INH-uif3SCd3QylY2bp7sTl2HqE9Z_t1/view?usp=drivesdk" },
+  { title: "Scaffolding Erection and Dismantling", link: "https://drive.google.com/file/d/1JYXU3ENYWZ9BF9HfCaTUTVuForzYiUXt/view?usp=drivesdk" },
+  { title: "Structural Steel Erection", link: "https://drive.google.com/file/d/1Q0otf_fesdi-6rGpBlO3oOPD5mmt8xxx/view?usp=drivesdk" },
+  { title: "Substation Civil Works", link: "https://drive.google.com/file/d/17zpuDsadYp6zW6J0KDkDU7LHGTkBm5A4/view?usp=drivesdk" },
+  { title: "Tie-in and Hot Tap Activities", link: "https://drive.google.com/file/d/1__MYES5_npv2x6pv3ROJcymdZgkLquLm/view?usp=drivesdk" },
+  { title: "Traffic Management and Flagman Duties", link: "https://drive.google.com/file/d/1bIPfM02kJri4zZlC2VUnMbYdfRrF_WA3/view?usp=drivesdk" },
+  { title: "Vehicle Movement inside Plant", link: "https://drive.google.com/file/d/1Swpghi0IHWvvwkuqdowJmA1nta8l9p42/view?usp=drivesdk" },
+  { title: "Welding and Fabrication Activities", link: "https://drive.google.com/file/d/1C6LFChQtQm2f4Sgkk4_fwluIF-oyr5u5/view?usp=drivesdk" }
+];
+
+document.addEventListener('click', (e)=>{
+  const t = e.target;
+  if (t && t.id === 'envEnableGeo'){
+    e.preventDefault();
+    askGeoAndLoadWeather();
+  }
 });
