@@ -13,18 +13,18 @@
     return Array.from(document.querySelectorAll(selector));
   }
 
-  function parseEvidenceLinks(cell) {
-    if (!cell) return [];
-    if (Array.isArray(cell)) return cell;
-
-    return cell
-      .split(/[\n;,]+/)
-      .map(part => part.trim())
-      .filter(part => part && /^https?:\/\//i.test(part));
-  }
-
   // Very small CSV parser that understands quotes and commas.
-  function parseCSV(text) {
+  function parseEvidenceLinks(cell) {
+  if (!cell) return [];
+  if (Array.isArray(cell)) return cell;
+
+  return String(cell)
+    .split(/[\n;,]+/)
+    .map(part => part.trim())
+    .filter(part => part && /^https?:\/\//i.test(part));
+}
+
+function parseCSV(text) {
     const rows = [];
     let current = [];
     let value = '';
@@ -144,7 +144,9 @@
     observations: [],
     observationsLoaded: false,
     lastHeatSummary: null,
-    lastWindSummary: null
+    lastWindSummary: null,
+    permits: [],
+    permitsLoaded: false
   };
 
   const obsFilterState = {
@@ -154,10 +156,18 @@
     search: ''
   };
 
+  const permitsFilterState = {
+    range: 'today',
+    area: '',
+    type: '',
+    search: ''
+  };
+
   // -------------------- Tab navigation --------------------
 
   // track whether observations have been loaded at least once
   let observationsInitialized = false;
+  let permitsInitialized = false;
 
   function openTab(evt, tabId) {
     // hide all tab contents
@@ -193,6 +203,12 @@
     if (tabId === 'ObservationsTab' && !observationsInitialized) {
       observationsInitialized = true;
       loadObservations();
+    }
+
+    // 🧾 lazy-load permits when Permits tab is opened
+    if (tabId === 'PermitsTab' && !permitsInitialized) {
+      permitsInitialized = true;
+      loadPermits();
     }
   }
 
@@ -953,16 +969,6 @@ function setupLibrarySwitcher() {
   }
 
   function openLibrary(type) {
-    // Safety Handbook opens directly in a new tab (single document)
-    if (type === 'handbook') {
-      window.open(
-        'https://drive.google.com/file/d/1u9YAc-BggTUomhuF7Hz0-zDZdGFA0Rpt/view',
-        '_blank',
-        'noopener'
-      );
-      return;
-    }
-
     chooser.style.display = 'none';
     content.style.display = 'block';
 
@@ -970,10 +976,8 @@ function setupLibrarySwitcher() {
       titleEl.textContent = 'Job Safety Analysis Library';
       if (jsaSearchWrapper) jsaSearchWrapper.style.display = 'block';
       if (tbtSearchWrapper) tbtSearchWrapper.style.display = 'none';
-      if (csmSearchWrapper) csmSearchWrapper.style.display = 'none';
       jsaList.style.display = 'block';
       tbtList.style.display = 'none';
-      if (csmList) csmList.style.display = 'none';
     } else if (type === 'tbt') {
       titleEl.textContent = 'Tool Box Talk Library';
       if (jsaSearchWrapper) jsaSearchWrapper.style.display = 'none';
@@ -1033,13 +1037,76 @@ function setupLibrarySwitcher() {
   }
 
   function classifyHeatRisk(heatIndexC) {
-    if (heatIndexC == null || isNaN(heatIndexC)) return { label: '--', level: 'unknown' };
+    if (heatIndexC == null || isNaN(heatIndexC)) {
+      return { label: '--', level: 'unknown' };
+    }
     if (heatIndexC < 29) return { label: 'Safe', level: 'safe' };
-    if (heatIndexC < 29) return { label: 'Caution', level: 'caution' };
+    if (heatIndexC < 32) return { label: 'Caution', level: 'caution' };
     if (heatIndexC < 38) return { label: 'Extreme Caution', level: 'warning' };
     if (heatIndexC < 51) return { label: 'Danger', level: 'danger' };
     return { label: 'Extreme Danger', level: 'extreme' };
   }
+
+  
+  function computeRiskMatrix(likelihoodLabel, severityLabel) {
+    if (!likelihoodLabel || !severityLabel) {
+      return {
+        score: null,
+        level: '--',
+        code: '--',
+        guidance: 'Select likelihood and severity to see guidance.'
+      };
+    }
+
+    const likelihoodMap = {
+      'Rare': 1,
+      'Unlikely': 2,
+      'Possible': 3,
+      'Likely': 4,
+      'Almost Certain': 5
+    };
+
+    const severityMap = {
+      'First Aid': 1,
+      'Medical Treatment': 2,
+      'Restricted Work / LTI': 3,
+      'Permanent Disability': 4,
+      'Fatality': 5
+    };
+
+    const l = likelihoodMap[likelihoodLabel] || 0;
+    const s = severityMap[severityLabel] || 0;
+    if (!l || !s) {
+      return {
+        score: null,
+        level: '--',
+        code: '--',
+        guidance: 'Select likelihood and severity to see guidance.'
+      };
+    }
+
+    const score = l * s;
+    let level = 'Low';
+    let code = 'RA1';
+    let guidance = 'RA1: Acceptable risk with standard controls. Maintain routine monitoring.';
+
+    if (score >= 5 && score <= 9) {
+      level = 'Medium';
+      code = 'RA2';
+      guidance = 'RA2: Improve controls where possible and monitor conditions.';
+    } else if (score >= 10 && score <= 16) {
+      level = 'High';
+      code = 'RA3';
+      guidance = 'RA3: Work only with controls in place and supervisor authorization.';
+    } else if (score >= 17) {
+      level = 'Critical';
+      code = 'RA4';
+      guidance = 'RA4: Stop work. Senior management approval and strong controls required.';
+    }
+
+    return { score, level, code, guidance };
+  }
+
 
   function classifyWindRisk(speed) {
     if (speed == null || isNaN(speed)) return { label: '--', level: 'unknown' };
@@ -1047,6 +1114,188 @@ function setupLibrarySwitcher() {
     if (speed < 20) return { label: 'Safe for normal work', level: 'safe' };
     if (speed < 32) return { label: 'Caution – Approaching man-basket limit', level: 'caution' };
     return { label: 'STOP Man-basket Operations (>32km/h)', level: 'danger' };
+  }
+
+  function formatWindDirection(deg) {
+    if (deg == null || isNaN(deg)) return '';
+    const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+    const index = Math.round(deg / 45) % 8;
+    return dirs[index];
+  }
+
+  function updateHomeEnvironmentFromWeather(payload) {
+    const homeHeat = $('#homeHeatSummary');
+    const homeWind = $('#homeWindSummary');
+    const hint = $('#homeEnvHint');
+
+    if (!homeHeat || !homeWind) return;
+
+    const { tempC, humidity, windSpeed, windDir } = payload || {};
+
+    // ---- Heat index text ----
+    let heatText = '--';
+    if (typeof tempC === 'number' && typeof humidity === 'number') {
+      const hiC = calculateHeatIndexC(tempC, humidity);
+      const risk = classifyHeatRisk(hiC);
+      if (hiC != null && !isNaN(hiC) && risk) {
+        const roundedHi = Math.round(hiC);
+        heatText = `${roundedHi}°C HI – ${risk.label}`;
+      }
+    }
+    homeHeat.textContent = heatText;
+
+    // ---- Wind text ----
+    let windText = '--';
+    if (typeof windSpeed === 'number') {
+      const risk = classifyWindRisk(windSpeed);
+      const roundedWind = Math.round(windSpeed);
+      const dirLabel = formatWindDirection(windDir);
+      if (risk && risk.label) {
+        windText = dirLabel
+          ? `${roundedWind} km/h ${dirLabel} – ${risk.label}`
+          : `${roundedWind} km/h – ${risk.label}`;
+      } else {
+        windText = `${roundedWind} km/h`;
+      }
+    }
+    homeWind.textContent = windText;
+
+    // ---- Hint line ----
+    if (hint) {
+      const bits = [];
+      if (typeof tempC === 'number') bits.push(`Temp ${Math.round(tempC)}°C`);
+      if (typeof humidity === 'number') bits.push(`RH ${Math.round(humidity)}%`);
+      if (typeof windSpeed === 'number') bits.push(`Wind ${Math.round(windSpeed)} km/h`);
+
+      if (bits.length) {
+        hint.textContent =
+          'Live data for your approximate location – ' +
+          bits.join(' · ') +
+          '. Always verify against site instruments before making safety decisions.';
+      } else {
+        hint.textContent =
+          'Unable to read full weather data. Please use site instruments and the Tools tab for manual calculations.';
+      }
+    }
+  }
+
+  function loadWeatherForCoords(lat, lon) {
+    const hint = $('#homeEnvHint');
+    const homeHeat = $('#homeHeatSummary');
+    const homeWind = $('#homeWindSummary');
+
+    if (homeHeat) homeHeat.textContent = 'Loading...';
+    if (homeWind) homeWind.textContent = 'Loading...';
+    if (hint) {
+      hint.textContent = 'Loading weather for your approximate location...';
+    }
+
+    const url =
+      'https://api.open-meteo.com/v1/forecast' +
+      `?latitude=${encodeURIComponent(lat)}` +
+      `&longitude=${encodeURIComponent(lon)}` +
+      '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m' +
+      '&timezone=auto';
+
+    fetch(url)
+      .then(res => {
+        if (!res.ok) {
+          throw new Error('Weather service error');
+        }
+        return res.json();
+      })
+      .then(data => {
+        const current = data && data.current;
+        if (!current) {
+          throw new Error('No current weather data returned');
+        }
+
+        updateHomeEnvironmentFromWeather({
+          tempC:
+            typeof current.temperature_2m === 'number'
+              ? current.temperature_2m
+              : null,
+          humidity:
+            typeof current.relative_humidity_2m === 'number'
+              ? current.relative_humidity_2m
+              : null,
+          windSpeed:
+            typeof current.wind_speed_10m === 'number'
+              ? current.wind_speed_10m
+              : null,
+          windDir:
+            typeof current.wind_direction_10m === 'number'
+              ? current.wind_direction_10m
+              : null
+        });
+      })
+      .catch(err => {
+        console.error('Weather fetch failed', err);
+        if (hint) {
+          hint.textContent =
+            'Unable to load weather for your location. Please check your connection or try again later.';
+        }
+      });
+  }
+
+  function askGeoAndLoadWeather() {
+    const hint = $('#homeEnvHint');
+
+    // Geolocation only works on HTTPS or localhost.
+    const { protocol, hostname } = window.location;
+    const isSecureContext =
+      protocol === 'https:' || hostname === 'localhost' || hostname === '127.0.0.1';
+
+    if (!isSecureContext) {
+      if (hint) {
+        hint.textContent =
+          'Geolocation is blocked on insecure connections. Please host this page on HTTPS or use localhost.';
+      }
+      alert(
+        'To use "Use my location", run this app on HTTPS (or localhost). Browsers block GPS on file:/// or plain HTTP.'
+      );
+      return;
+    }
+
+    if (!navigator.geolocation) {
+      if (hint) {
+        hint.textContent =
+          'Geolocation is not supported on this device. Enter values manually in the Tools tab.';
+      }
+      alert('Geolocation is not supported on this device/browser.');
+      return;
+    }
+
+    if (hint) {
+      hint.textContent =
+        'Getting your location (you may need to allow permission in the browser)...';
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const { latitude, longitude } = pos.coords || {};
+        if (latitude == null || longitude == null) {
+          if (hint) {
+            hint.textContent =
+              'Could not read GPS coordinates. Please try again or use manual input in the Tools tab.';
+          }
+          alert('Could not read GPS coordinates.');
+          return;
+        }
+        loadWeatherForCoords(latitude, longitude);
+      },
+      err => {
+        console.error('Geolocation error', err);
+        if (hint) {
+          hint.textContent =
+            'Unable to get your location: ' +
+            err.message +
+            '. You can still use the Tools tab for manual calculations.';
+        }
+        alert('Unable to get your location: ' + err.message);
+      },
+      { enableHighAccuracy: true, timeout: 15000 }
+    );
   }
 
 function calculateHeatIndex() {
@@ -1385,33 +1634,459 @@ function calculateWindSafety() {
 
   function setupTools() {
     const kpiBtn = document.querySelector('[data-tool="kpi"]');
-    const heatBtn = document.querySelector('[data-tool="heat"]');
-    const windBtn = document.querySelector('[data-tool="wind"]');
+    const riskBtn = document.querySelector('[data-tool="risk"]');
+    const heatBtn = document.querySelector('[data-tool="heat"]'); // Calculators
+
     const kpiSection = $('#kpiSection');
+    const riskSection = $('#riskMatrixSection');
     const heatSection = $('#heatStressSection');
     const windSection = $('#windSpeedSection');
 
     function setActive(tool) {
-      [kpiBtn, heatBtn, windBtn].forEach(btn => btn && btn.classList.remove('active-tool'));
+      [kpiBtn, riskBtn, heatBtn].forEach(btn => btn && btn.classList.remove('active-tool'));
+
       if (tool === 'kpi' && kpiBtn) kpiBtn.classList.add('active-tool');
+      if (tool === 'risk' && riskBtn) riskBtn.classList.add('active-tool');
       if (tool === 'heat' && heatBtn) heatBtn.classList.add('active-tool');
-      if (tool === 'wind' && windBtn) windBtn.classList.add('active-tool');
 
       if (kpiSection) kpiSection.style.display = tool === 'kpi' ? 'block' : 'none';
-      if (heatSection) heatSection.style.display = tool === 'heat' ? 'block' : 'none';
-      if (windSection) windSection.style.display = tool === 'wind' ? 'block' : 'none';
+      if (riskSection) riskSection.style.display = tool === 'risk' ? 'block' : 'none';
+
+      const showCalculators = tool === 'heat';
+      if (heatSection) heatSection.style.display = showCalculators ? 'block' : 'none';
+      if (windSection) windSection.style.display = showCalculators ? 'block' : 'none';
     }
 
     if (kpiBtn) kpiBtn.addEventListener('click', () => setActive('kpi'));
+    if (riskBtn) riskBtn.addEventListener('click', () => setActive('risk'));
     if (heatBtn) heatBtn.addEventListener('click', () => setActive('heat'));
-    if (windBtn) windBtn.addEventListener('click', () => setActive('wind'));
 
-    // expose for old inline onclick, if it exists
+    // expose for any old inline onclick
     window.switchTool = setActive;
 
-    // default
+    // default view: Daily Snapshot
     setActive('kpi');
   }
+
+// -------------------- Permits (CSV) --------------------
+
+async function loadPermits() {
+  const url = window.PERMITS_SHEET_CSV_URL ||
+    'https://docs.google.com/spreadsheets/d/e/2PACX-1vS2D8IOXDcrOpuD1u4moykgT8tNxtsUGIcPjZkwN8gnuwgHCEz4eCh9_5n83vhYoraB4YSkm9YAda17/pub?output=csv';
+  const list = $('#permitsList');
+  const emptyState = $('#permitsEmptyState');
+  const totalEl = $('#permitsCountTotal');
+  const todayEl = $('#permitsCountToday');
+
+  if (!list) return;
+
+  if (emptyState) emptyState.style.display = 'none';
+  list.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading permits...</div>';
+
+  if (!url) {
+    list.innerHTML = '<p class="text-muted">No permits sheet configured. Set PERMITS_SHEET_CSV_URL in js/data.js.</p>';
+    if (emptyState) {
+      emptyState.style.display = 'block';
+      const p = emptyState.querySelector('p');
+      if (p) p.textContent = 'No permits sheet configured. Set PERMITS_SHEET_CSV_URL in js/data.js.';
+    }
+    return;
+  }
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    const rows = parseCSV(text);
+    if (!rows.length) throw new Error('Empty sheet');
+
+    const headers = rows[0];
+    const body = rows.slice(1).filter(r => r.some(c => c && c.trim() !== ''));
+
+    const idxDate = findColumnIndex(headers, ['Date']);
+    const idxArea = findColumnIndex(headers, ['Area / Location', 'Area', 'Location']);
+    const idxReceiver = findColumnIndex(headers, ['Work Permit Receiver Name', 'Work Permit Receiver Name :', 'Receiver']);
+    const idxProject = findColumnIndex(headers, ['Project']);
+    const idxType = findColumnIndex(headers, ['Work Permit Type', 'Permit Type']);
+    const idxNumber = findColumnIndex(headers, ['Work Permit Number', 'Work Permit Number :', 'Permit Number']);
+    const idxDesc = findColumnIndex(headers, ['Work Description (summary)', 'Work Description', 'Description']);
+    const idxCorrective = findColumnIndex(headers, ['Corrective actions taken (if any)', 'Corrective actions taken']);
+    const idxIssues = findColumnIndex(headers, ['Any issues / unsafe acts / remarks?', 'Any issues / unsafe acts / remarks']);
+    const idxPermitFile = findColumnIndex(headers, ['Upload today’s Work Permit (photo/PDF)', "Upload today's Work Permit (photo/PDF)"]);
+    const idxConfirm = findColumnIndex(headers, ['Confirmation']);
+
+    const evidenceIndices = [];
+    if (headers && headers.length) {
+      headers.forEach((h, i) => {
+        const v = (h || '').toLowerCase();
+        if (v.includes('upload work evidence')) {
+          evidenceIndices.push(i);
+        }
+      });
+    }
+
+    const permits = body.map((row, index) => {
+      const dateRaw = idxDate !== -1 ? (row[idxDate] || '') : '';
+      const date = parseSheetDate(dateRaw);
+      const area = idxArea !== -1 ? (row[idxArea] || '') : '';
+      const receiver = idxReceiver !== -1 ? (row[idxReceiver] || '') : '';
+      const project = idxProject !== -1 ? (row[idxProject] || '') : '';
+      const type = idxType !== -1 ? (row[idxType] || '') : '';
+      const permitNo = idxNumber !== -1 ? (row[idxNumber] || '') : '';
+      const description = idxDesc !== -1 ? (row[idxDesc] || '') : '';
+      const corrective = idxCorrective !== -1 ? (row[idxCorrective] || '') : '';
+      const issues = idxIssues !== -1 ? (row[idxIssues] || '') : '';
+      const permitFile = idxPermitFile !== -1 ? (row[idxPermitFile] || '') : '';
+      const confirmation = idxConfirm !== -1 ? (row[idxConfirm] || '') : '';
+
+      const evidence = evidenceIndices
+        .map(i => row[i])
+        .filter(Boolean)
+        .map(v => (v || '').trim());
+
+      return {
+        _index: index,
+        dateRaw,
+        date,
+        area,
+        receiver,
+        project,
+        type,
+        permitNo,
+        description,
+        corrective,
+        issues,
+        permitFile,
+        evidence,
+        confirmation
+      };
+    });
+
+    state.permits = permits;
+    state.permitsLoaded = true;
+
+    buildPermitsFilterOptions();
+    renderPermitsList();
+    updateToolsSnapshot();
+
+    if (totalEl) totalEl.textContent = permits.length || '--';
+    if (todayEl) {
+      const today = startOfDay(new Date());
+      const todayCount = permits.filter(p => p.date && isSameDay(p.date, today)).length;
+      todayEl.textContent = todayCount || '0';
+    }
+
+    const receiversEl = $('#permitsCountReceivers');
+    if (receiversEl) {
+      const receivers = Array.from(new Set(
+        permits.map(p => (p.receiver || '').trim()).filter(Boolean)
+      ));
+      receiversEl.textContent = receivers.length || '0';
+    }
+  } catch (err) {
+    console.error('Failed to load permits', err);
+    if (list) {
+      list.innerHTML =
+        '<p class="text-muted">Could not load permits. Check the sheet link or network connection.</p>';
+    }
+    if (emptyState) emptyState.style.display = 'block';
+  }
+}
+
+function buildPermitsFilterOptions() {
+  const permits = state.permits || [];
+  const areaSelect = $('#permitsAreaFilter');
+  const typeSelect = $('#permitsTypeFilter');
+
+  if (!areaSelect || !typeSelect) return;
+
+  const areas = Array.from(
+    new Set(permits.map(p => (p.area || '').trim()).filter(Boolean))
+  ).sort((a, b) => a.localeCompare(b));
+
+  const types = Array.from(
+    new Set(permits.map(p => (p.type || '').trim()).filter(Boolean))
+  ).sort((a, b) => a.localeCompare(b));
+
+  areaSelect.innerHTML = '<option value="">All Areas</option>' + areas
+    .map(a => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`)
+    .join('');
+
+  typeSelect.innerHTML = '<option value="">All Types</option>' + types
+    .map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`)
+    .join('');
+}
+
+function getPermitTypeClass(type) {
+  if (!type) return '';
+  const t = type.toLowerCase();
+
+  if (t.includes('hot')) return 'permit-type-hot';
+  if (t.includes('cold')) return 'permit-type-cold';
+  if (t.includes('opening') || t.includes('line break') || t.includes('line-break')) return 'permit-type-opening';
+  if (t.includes('confined')) return 'permit-type-confined';
+  return '';
+}
+
+function getPermitTypeLabel(type) {
+  if (!type) return '';
+  const t = type.toLowerCase();
+
+  if (t.includes('hot')) return 'Hot Work';
+  if (t.includes('cold')) return 'Cold Work';
+  if (t.includes('opening') || t.includes('line break') || t.includes('line-break')) {
+    return 'Equipment Opening / Line Break';
+  }
+  if (t.includes('confined')) return 'Confined Space Entry';
+  return type;
+}
+
+function renderPermitsList() {
+  const list = $('#permitsList');
+  const emptyState = $('#permitsEmptyState');
+
+  if (!list) return;
+
+  const permits = state.permits || [];
+
+  if (!permits.length) {
+    list.innerHTML = '';
+    if (emptyState) emptyState.style.display = 'block';
+    return;
+  }
+
+  if (emptyState) emptyState.style.display = 'none';
+
+  const { range, area, type, search } = permitsFilterState;
+  const searchTerm = (search || '').toLowerCase();
+  const today = startOfDay(new Date());
+
+  const filtered = permits.filter(p => {
+    // Date range filter
+    if (range && range !== 'all') {
+      if (!p.date) return false;
+      if (range === 'today' && !isSameDay(p.date, today)) return false;
+      if (range === 'week' && Math.abs(daysBetween(p.date, today)) > 7) return false;
+      if (range === 'month' && !isSameMonth(p.date, today)) return false;
+    }
+
+    if (area && (!p.area || p.area !== area)) return false;
+    if (type && (!p.type || p.type !== type)) return false;
+
+    if (searchTerm) {
+      const hay = [
+        p.area,
+        p.type,
+        p.receiver,
+        p.project,
+        p.permitNo,
+        p.description,
+        p.issues
+      ].filter(Boolean).join(' ').toLowerCase();
+      if (!hay.includes(searchTerm)) return false;
+    }
+    return true;
+  });
+
+  if (!filtered.length) {
+    list.innerHTML = '<p class="text-muted">No permits match the current filters.</p>';
+    return;
+  }
+
+  list.innerHTML = filtered.map(p => {
+    const dateText = p.date
+      ? p.date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+      : (p.dateRaw || '');
+
+    const typeChipClass = getPermitTypeClass(p.type);
+    const hasEvidence = Array.isArray(p.evidence) && p.evidence.length;
+
+    const evidenceIcon = hasEvidence
+      ? '<span class="obs-evidence-chip" title="Work evidence attached" aria-label="Work evidence attached"><i class="fas fa-image"></i></span>'
+      : '';
+
+    return `
+      <article class="obs-card permit-card" data-permit-index="${p._index}">
+        <header class="obs-card-header">
+          <div class="obs-card-date">${escapeHtml(dateText)}</div>
+          <div class="obs-card-badges">
+            ${evidenceIcon}
+            ${p.area ? `<span class="obs-chip">${escapeHtml(p.area)}</span>` : ''}
+            ${p.type ? `<span class="obs-chip permit-type-chip ${typeChipClass}">${escapeHtml(getPermitTypeLabel(p.type))}</span>` : ''}
+          </div>
+        </header>
+        <div class="obs-card-body">
+          <div class="obs-main-line">
+            <span class="obs-type">${escapeHtml(p.project || 'Work Permit')}</span>
+            <span class="obs-area">${escapeHtml(p.permitNo || '')}</span>
+          </div>
+          <p class="obs-description">${escapeHtml(p.description || '')}</p>
+        </div>
+        <footer class="obs-card-footer">
+          <span class="obs-reporter">
+            <i class="fas fa-user-shield"></i>
+            ${escapeHtml(p.receiver || 'Unknown receiver')}
+          </span>
+        </footer>
+      </article>
+    `;
+  }).join('');
+
+  list.querySelectorAll('.permit-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const idxStr = card.getAttribute('data-permit-index');
+      const idx = parseInt(idxStr, 10);
+      const permit = state.permits[idx];
+      if (permit) showPermitDetail(permit);
+    });
+  });
+}
+
+function setupPermitsFilters() {
+  const rangeButtons = $all('#PermitsTab .permits-filter-chip');
+  const areaSelect = $('#permitsAreaFilter');
+  const typeSelect = $('#permitsTypeFilter');
+  const searchInput = $('#permitsSearch');
+  const openSheetBtn = $('#permitsOpenSheetButton');
+
+  rangeButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      rangeButtons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      permitsFilterState.range = btn.dataset.range || 'today';
+      renderPermitsList();
+    });
+  });
+
+  if (areaSelect) {
+    areaSelect.addEventListener('change', () => {
+      permitsFilterState.area = areaSelect.value || '';
+      renderPermitsList();
+    });
+  }
+
+  if (typeSelect) {
+    typeSelect.addEventListener('change', () => {
+      permitsFilterState.type = typeSelect.value || '';
+      renderPermitsList();
+    });
+  }
+
+  if (searchInput) {
+    searchInput.addEventListener('input', () => {
+      permitsFilterState.search = searchInput.value || '';
+      renderPermitsList();
+    });
+  }
+
+  if (openSheetBtn) {
+    openSheetBtn.addEventListener('click', () => {
+      const url = window.PERMITS_FULL_SHEET_URL ||
+        window.PERMITS_SHEET_CSV_URL ||
+        'https://docs.google.com/spreadsheets/d/e/2PACX-1vS2D8IOXDcrOpuD1u4moykgT8tNxtsUGIcPjZkwN8gnuwgHCEz4eCh9_5n83vhYoraB4YSkm9YAda17/pub?output=csv';
+      window.open(url, '_blank');
+    });
+  }
+}
+
+function showPermitDetail(permit) {
+  const modal = $('#permitDetailModal');
+  const body = $('#permitDetailBody');
+  if (!modal || !body) return;
+
+  const dateText = permit.date
+    ? permit.date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+    : (permit.dateRaw || '');
+
+  const row = (label, value) => {
+    if (!value) return '';
+    return `
+      <div class="obs-detail-row">
+        <div class="obs-detail-label">${label}</div>
+        <div class="obs-detail-value">${value}</div>
+      </div>
+    `;
+  };
+
+  const evidenceLinks = Array.isArray(permit.evidence) ? permit.evidence : [];
+  let evidenceSection = '';
+  if (evidenceLinks.length || permit.permitFile) {
+    const rawLinks = [permit.permitFile, ...evidenceLinks].map(v => (v || '').trim()).filter(Boolean);
+    const validLinks = rawLinks.filter(url => /^https?:\/\//i.test(url));
+
+    if (validLinks.length) {
+      const linksInline = validLinks
+        .map((url, i) => `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">Evidence ${i + 1}</a>`)
+        .join(' • ');
+
+      evidenceSection = `
+        <section class="obs-detail-section">
+          <div class="obs-detail-section-title">Permits &amp; Evidence</div>
+          <p class="obs-detail-description-box">
+            ${linksInline}
+          </p>
+          <p class="obs-detail-hint">
+            Evidence is stored in Google Drive. Open the links above to view today’s permit and site photos.
+          </p>
+        </section>
+      `;
+    }
+  }
+
+  body.innerHTML = `
+    <section class="obs-detail-section">
+      <div class="obs-detail-section-title">Overview</div>
+      <div class="obs-detail-grid">
+        ${row('Date', escapeHtml(dateText))}
+        ${row('Area / Location', escapeHtml(permit.area || ''))}
+        ${row('Project', escapeHtml(permit.project || ''))}
+        ${row('Work Permit Type', escapeHtml(permit.type || ''))}
+        ${row('Work Permit Number', escapeHtml(permit.permitNo || ''))}
+        ${row('Receiver Name', escapeHtml(permit.receiver || ''))}
+      </div>
+    </section>
+
+    <section class="obs-detail-section">
+      <div class="obs-detail-section-title">Work Description</div>
+      <div class="obs-detail-description-box">
+        ${escapeHtml(permit.description || 'No description provided.')}
+      </div>
+    </section>
+
+    <section class="obs-detail-section">
+      <div class="obs-detail-section-title">Corrective Actions</div>
+      <div class="obs-detail-description-box">
+        ${escapeHtml(permit.corrective || 'No corrective actions recorded.')}
+      </div>
+    </section>
+
+    <section class="obs-detail-section">
+      <div class="obs-detail-section-title">Issues / Unsafe Acts / Remarks</div>
+      <div class="obs-detail-description-box">
+        ${escapeHtml(permit.issues || 'No issues recorded.')}
+      </div>
+    </section>
+
+    ${evidenceSection}
+
+    <section class="obs-detail-section">
+      <div class="obs-detail-section-title">Confirmation</div>
+      <div class="obs-detail-description-box">
+        ${escapeHtml(permit.confirmation || 'No confirmation recorded.')}
+      </div>
+    </section>
+  `;
+
+  modal.classList.add('show');
+}
+
+function hidePermitDetailModal() {
+  const modal = $('#permitDetailModal');
+  if (modal) modal.classList.remove('show');
+}
+
+window.hidePermitDetailModal = hidePermitDetailModal;
+
 
 // -------------------- Observations (CSV) --------------------
 
@@ -1537,6 +2212,7 @@ async function loadObservations() {
     state.observationsLoaded = true;
 
     updateHomeFromObservations();
+    updateToolsSnapshot();
     setupObservationsFilters();
     renderObservationsList();
   } catch (err) {
@@ -1567,6 +2243,33 @@ function updateHomeFromObservations() {
   if (observersEl) observersEl.textContent = observersToday || '--';
   if (obsTodayEl) obsTodayEl.textContent = todayObs.length || '--';
   if (highRiskEl) highRiskEl.textContent = highRiskOpen || '0';
+}
+
+
+function updateToolsSnapshot() {
+  const obs = state.observations || [];
+  const permits = state.permits || [];
+
+  const toolsObsTodayEl = $('#toolsObservationsToday');
+  const toolsPermitsTodayEl = $('#toolsPermitsToday');
+  const toolsHighRiskEl = $('#toolsHighRiskOpen');
+
+  if (!toolsObsTodayEl && !toolsPermitsTodayEl && !toolsHighRiskEl) return;
+
+  const today = startOfDay(new Date());
+
+  const todayObs = obs.filter(o => o.date && isSameDay(o.date, today));
+  const highRiskOpen = obs.filter(o => {
+    const level = (o.raLevel || '').toLowerCase();
+    const status = (o.status || '').toLowerCase();
+    return level.includes('high') && !status.includes('close');
+  }).length;
+
+  const todayPermits = permits.filter(p => p.date && isSameDay(p.date, today));
+
+  if (toolsObsTodayEl) toolsObsTodayEl.textContent = todayObs.length || '--';
+  if (toolsPermitsTodayEl) toolsPermitsTodayEl.textContent = todayPermits.length || '--';
+  if (toolsHighRiskEl) toolsHighRiskEl.textContent = highRiskOpen || '0';
 }
 
 function filterObservationsForRange(list, range) {
@@ -1605,7 +2308,7 @@ function updateObservationsSummary() {
 }
 
 function setupObservationsFilters() {
-  const rangeButtons = $all('.obs-filter-chip');
+  const rangeButtons = $all('#ObservationsTab .obs-filter-chip');
   const riskSelect = $('#obsFilterRisk');
   const statusSelect = $('#obsFilterStatus');
   const searchInput = $('#obsSearch');
@@ -1833,43 +2536,15 @@ function showObservationDetail(obs) {
       }">${obsClassValue}</span>`
     : '';
 
-    // Evidence section (Google Drive links only)
-  const evidenceLinks = Array.isArray(obs.evidenceLinks) && obs.evidenceLinks.length
-    ? obs.evidenceLinks
-    : (obs.evidenceUrl ? [obs.evidenceUrl] : []);
-
-  let evidenceSection = '';
-  if (evidenceLinks.length) {
-    const validLinks = evidenceLinks
-      .map(url => (url || '').trim())
-      .filter(url => /^https?:\/\//i.test(url));
-
-    if (validLinks.length) {
-      const linksInline = validLinks
-        .map((url, idx) => {
-          const label = `Evident ${idx + 1}`;
-          return `<a href="${url}" target="_blank" rel="noopener">${label}</a>`;
-        })
-        .join(' - ');
-
-      evidenceSection = `
-        <section class="obs-detail-section">
-          <div class="obs-detail-section-title">Observation Evidence</div>
-          <div class="obs-evidence-box">
-            <p class="obs-evidence-links-line">
-              ${linksInline}
-            </p>
-            <p class="obs-evidence-hint">
-              Evidence is stored in Google Drive. Open the links above to view the photos or files.
-            </p>
-          </div>
-        </section>
-      `;
-    }
-  }
-
   body.innerHTML = `
-  </div>
+    <div class="obs-detail-header-line">
+      <div class="obs-header-left">
+        ${obs.code ? `<span class="obs-header-pill code">Code: ${obs.code}</span>` : ''}
+      </div>
+      <div class="obs-header-right">
+        ${obs.raLevel ? `<span class="${raChipClass}">${obs.raLevel}</span>` : ''}
+        ${obs.status ? `<span class="${statusChipClass}">${obs.status}</span>` : ''}
+      </div>
     </div>
 
     <section class="obs-detail-section">
@@ -1891,7 +2566,27 @@ function showObservationDetail(obs) {
       </div>
     </section>
 
-    ${evidenceSection}
+    ${(() => {
+      const links = Array.isArray(obs.evidenceLinks) ? obs.evidenceLinks : (obs.evidenceUrl ? [obs.evidenceUrl] : []);
+      const valid = links
+        .map(v => (v || '').trim())
+        .filter(v => v && /^https?:\/\//i.test(v));
+      if (!valid.length) return '';
+      const inline = valid
+        .map((url, i) => `<a href="${url}" target="_blank" rel="noopener">Evidence ${i + 1}</a>`)
+        .join(' • ');
+      return `
+        <section class="obs-detail-section">
+          <div class="obs-detail-section-title">Observation Evidence</div>
+          <p class="obs-detail-description-box">
+            ${inline}
+          </p>
+          <p class="obs-detail-hint">
+            Evidence is stored in Google Drive. Open the links to view observation photos and attachments.
+          </p>
+        </section>
+      `;
+    })()}
 
     <section class="obs-detail-section">
       <div class="obs-detail-section-title">Person / Group</div>
@@ -2070,20 +2765,70 @@ function initTasksIframe() {
     }
   }
 
+
+  function setupDailyTasksButton() {
+    const btn = $('#dailyTasksButton');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      const iframe = document.getElementById('tasksIframe');
+      const directUrl =
+        (window.TASKS_FORM_URL && String(window.TASKS_FORM_URL).trim()) ||
+        (window.TASKS_FORM_EMBED_URL && String(window.TASKS_FORM_EMBED_URL).trim()) ||
+        (iframe && iframe.dataset && iframe.dataset.src ? iframe.dataset.src : '');
+
+      if (directUrl) {
+        // Navigate to the daily tasks form in the same tab
+        window.location.href = directUrl;
+      } else {
+        // Fallback: open the Tasks tab inside the app
+        openTab(null, 'TasksTab');
+      }
+    });
+  }
+
   // -------------------- Init app --------------------
 
-  function initApp() {
+  
+  function setupRiskMatrix() {
+    const likeSel = $('#riskLikelihood');
+    const sevSel = $('#riskSeverity');
+    const scoreEl = $('#riskScoreValue');
+    const levelEl = $('#riskLevelLabel');
+    const codeEl = $('#riskCodeValue');
+    const guidanceEl = $('#riskGuidanceText');
+
+    if (!likeSel || !sevSel) return;
+
+    const recompute = () => {
+      const likeVal = likeSel.value || '';
+      const sevVal = sevSel.value || '';
+      const result = computeRiskMatrix(likeVal, sevVal);
+
+      if (scoreEl) scoreEl.textContent = result.score != null ? String(result.score) : '--';
+      if (levelEl) levelEl.textContent = result.level || '--';
+      if (codeEl) codeEl.textContent = result.code || '--';
+      if (guidanceEl) guidanceEl.textContent = result.guidance || 'Select likelihood and severity to see guidance.';
+    };
+
+    likeSel.addEventListener('change', recompute);
+    sevSel.addEventListener('change', recompute);
+  }
+
+
+function initApp() {
 setupDarkMode();
     setupNav();
     setupAccordions();
     setupModals();
     setupAddObservationButton();
+    setupDailyTasksButton();
     setupTbtOfDay();
     setupTbtLibrary();
     setupJsaLibrary();
     setupCsmLibrary();
 setupLibrarySwitcher();   // 👈 NEW
     setupTools();
+    setupRiskMatrix();
     loadEomAndLeaderboard();
     loadObservations();
     loadNews();
@@ -2280,14 +3025,15 @@ window.jsaData = [
   { title: "Welding and Fabrication Activities", link: "https://drive.google.com/file/d/1C6LFChQtQm2f4Sgkk4_fwluIF-oyr5u5/view?usp=drivesdk" }
 ];
 
-document.addEventListener('click', (e)=>{
+document.addEventListener('click', (e) => {
   const t = e.target;
-  if (!t) return;
-  const btn = t.id === 'envEnableGeo'
-    ? t
-    : (t.closest ? t.closest('#envEnableGeo') : null);
-  if (btn){
+  if (!t || !t.closest) return;
+
+  // Environment Status "Use my location" button
+  const envBtn = t.closest('#envEnableGeo');
+  if (envBtn) {
     e.preventDefault();
     askGeoAndLoadWeather();
+    return;
   }
 });
