@@ -166,6 +166,7 @@
                         type="button"
                         class="gps-btn home-env-location-btn"
                         id="envEnableGeo"
+                        onclick="askGeoAndLoadWeather()"
                     >
                         <i class="fas fa-location-crosshairs"></i>
                         Use my location
@@ -389,6 +390,68 @@
             </div>
         </section>
 
+        <!-- PERMITS TAB -->
+        <section id="PermitsTab" class="tab-content">
+            <div class="obs-summary-bar">
+                <div class="obs-summary-item">
+                    <div class="obs-summary-label">Total Permits</div>
+                    <div class="obs-summary-value" id="permitsCountTotal">--</div>
+                </div>
+                <div class="obs-summary-item">
+                    <div class="obs-summary-label">Unique Receivers</div>
+                    <div class="obs-summary-value" id="permitsCountReceivers">--</div>
+                </div>
+                <div class="obs-summary-item">
+                    <div class="obs-summary-label">Today</div>
+                    <div class="obs-summary-value" id="permitsCountToday">--</div>
+                </div>
+            </div>
+
+            <div class="obs-filters">
+                <div class="obs-filter-row">
+                    <button class="obs-filter-chip permits-filter-chip active" data-range="today">Today</button>
+                    <button class="obs-filter-chip permits-filter-chip" data-range="week">This Week</button>
+                    <button class="obs-filter-chip permits-filter-chip" data-range="month">This Month</button>
+                    <button class="obs-filter-chip permits-filter-chip" data-range="all">All</button>
+                </div>
+                <div class="obs-filter-row">
+                    <select id="permitsAreaFilter">
+                        <option value="">All Areas</option>
+                    </select>
+                    <select id="permitsTypeFilter">
+                        <option value="">All Types</option>
+                    </select>
+                </div>
+                <div class="obs-filter-row">
+                    <input type="text" id="permitsSearch" placeholder="Search by area, type, receiver, project, permit #..." />
+                </div>
+                <div class="obs-filter-row" style="justify-content: flex-start;">
+                    <a
+                        id="addPermitButton"
+                        class="obs-open-sheet-btn"
+                        href="https://forms.gle/SNtQRDjAGshRrwBj6"
+                        target="_blank"
+                        rel="noopener"
+                    >
+                        <i class="fas fa-plus-circle"></i>
+                        Add New Permit
+                    </a>
+                </div>
+            </div>
+
+            <div id="permitsList"></div>
+
+            <button id="permitsOpenSheetButton" class="obs-open-sheet-btn" type="button">
+                <i class="fas fa-table"></i>
+                Open full permits sheet
+            </button>
+
+            <div id="permitsEmptyState" class="obs-empty-state" style="display: none;">
+                <i class="fas fa-database"></i>
+                <p>No permits data loaded yet.</p>
+            </div>
+        </section>
+
         <!-- TASKS TAB -->
         <section id="TasksTab" class="tab-content">
             <iframe
@@ -422,12 +485,11 @@
   <h3>Construction Safety Manual (CSM)</h3>
   <p>Browse CSM chapters, guidelines & procedures.</p>
 </div>
-
-                            <div class="library-choice-card library-card" data-library="handbook">
-                    <i class="fas fa-book-bookmark" style="color: #f97316;"></i>
-                    <h3>Safety Handbook</h3>
-                    <p>Minimum Safety Rules</p>
-                </div>
+<div class="library-choice-card library-card" onclick="window.open('https://drive.google.com/file/d/109vG3Hk3PdgvQF87k0EJ1IiKDTDfdQTv/view?usp=sharing', '_blank')">
+  <i class="fa-solid fa-book-bookmark" style="color: #22c55e;"></i>
+  <h3>Saudi Aramco Safety Handbook</h3>
+  <p>Open the latest handbook in a new tab.</p>
+</div>
 
             </div>
 
@@ -477,31 +539,104 @@
         <section id="ToolsTab" class="tab-content">
             <div class="tool-toggle-container">
                 <button class="tool-toggle-btn active-tool" type="button" data-tool="kpi">
-                    Safety KPIs
+                    Daily Snapshot
+                </button>
+                <button class="tool-toggle-btn" type="button" data-tool="risk">
+                    Risk Matrix
                 </button>
                 <button class="tool-toggle-btn" type="button" data-tool="heat">
-                    Heat Stress
-                </button>
-                <button class="tool-toggle-btn" type="button" data-tool="wind">
-                    Wind Limits
+                    Calculators
                 </button>
             </div>
 
-            <!-- KPI CARD -->
+            <!-- DAILY SNAPSHOT CARD -->
             <section id="kpiSection" class="home-card tools-card">
                 <div class="tools-section-header">
-                    <i class="fas fa-calculator"></i>
+                    <i class="fas fa-clipboard-check"></i>
                     <div>
-                        <h3>Safety KPI Helper</h3>
-                        <small>Use this area to keep track of key indicators.</small>
+                        <h3>Today on Site</h3>
+                        <small>Quick snapshot for the safety officer.</small>
                     </div>
                 </div>
+
+                <div class="home-kpi-row tools-kpi-row">
+                    <div class="home-kpi-card">
+                        <div class="home-kpi-label">Observations Today</div>
+                        <div class="home-kpi-value" id="toolsObservationsToday">--</div>
+                    </div>
+                    <div class="home-kpi-card">
+                        <div class="home-kpi-label">Permits Today</div>
+                        <div class="home-kpi-value" id="toolsPermitsToday">--</div>
+                    </div>
+                    <div class="home-kpi-card">
+                        <div class="home-kpi-label">Open High-Risk</div>
+                        <div class="home-kpi-value" id="toolsHighRiskOpen">--</div>
+                    </div>
+                </div>
+
                 <p class="tools-note">
-                    (You can later replace this with your own KPI formulas and cards.)
+                    Counts are based on today's observations and permits data.
                 </p>
             </section>
 
-            <!-- HEAT STRESS CARD -->
+            
+            <!-- RISK MATRIX CARD -->
+            <section id="riskMatrixSection" class="home-card tools-card" style="display: none;">
+                <div class="tools-section-header">
+                    <i class="fas fa-chart-line"></i>
+                    <div>
+                        <h3>Risk Matrix / RA Helper</h3>
+                        <small>Select likelihood &amp; severity to get RA level.</small>
+                    </div>
+                </div>
+
+                <div class="kpi-card risk-matrix-card">
+                    <div class="kpi-input-group">
+                        <label for="riskLikelihood">Likelihood</label>
+                        <select id="riskLikelihood" class="kpi-input-field">
+                            <option value="">Select likelihood</option>
+                            <option value="Rare">Rare</option>
+                            <option value="Unlikely">Unlikely</option>
+                            <option value="Possible">Possible</option>
+                            <option value="Likely">Likely</option>
+                            <option value="Almost Certain">Almost Certain</option>
+                        </select>
+                    </div>
+
+                    <div class="kpi-input-group">
+                        <label for="riskSeverity">Severity</label>
+                        <select id="riskSeverity" class="kpi-input-field">
+                            <option value="">Select severity</option>
+                            <option value="First Aid">First Aid</option>
+                            <option value="Medical Treatment">Medical Treatment</option>
+                            <option value="Restricted Work / LTI">Restricted Work / LTI</option>
+                            <option value="Permanent Disability">Permanent Disability</option>
+                            <option value="Fatality">Fatality</option>
+                        </select>
+                    </div>
+
+                    <div class="kpi-output-grid">
+                        <div class="kpi-output-item">
+                            <div class="kpi-output-label">Risk Score</div>
+                            <div class="kpi-output-value" id="riskScoreValue">--</div>
+                        </div>
+                        <div class="kpi-output-item">
+                            <div class="kpi-output-label">Risk Level</div>
+                            <div class="kpi-output-value" id="riskLevelLabel">--</div>
+                        </div>
+                        <div class="kpi-output-item">
+                            <div class="kpi-output-label">RA Code</div>
+                            <div class="kpi-output-value" id="riskCodeValue">--</div>
+                        </div>
+                    </div>
+
+                    <p class="tools-note" id="riskGuidanceText">
+                        Select likelihood and severity to see guidance.
+                    </p>
+                </div>
+            </section>
+
+<!-- HEAT STRESS CARD -->
             <section id="heatStressSection" class="home-card tools-card" style="display: none;">
                 <div class="tools-section-header heat">
                     <i class="fas fa-sun"></i>
@@ -598,6 +733,18 @@
             </div>
         </div>
 
+
+        <!-- 🔍 Permit detail modal -->
+        <div id="permitDetailModal" class="modal">
+            <div class="modal-content">
+                <button class="close-btn" type="button" onclick="hidePermitDetailModal()">
+                    &times;
+                </button>
+                <h2>Work Permit Details</h2>
+                <div id="permitDetailBody"></div>
+            </div>
+        </div>
+
     </main>
 
     <!-- FLOATING BUTTONS -->
@@ -609,6 +756,15 @@
     >
         <i class="fas fa-plus"></i> Add New Observation
     </a>
+
+    <button
+        id="dailyTasksButton"
+        class="daily-tasks-btn"
+        type="button"
+        title="Daily Tasks"
+    >
+        <i class="fas fa-list-check"></i> Daily Tasks
+    </button>
 
     <button
         id="emergencyQuickButton"
@@ -629,9 +785,9 @@
             <span class="nav-icon"><i class="fas fa-chart-line"></i></span>
             <span>Observations</span>
         </button>
-        <button class="nav-button" type="button" data-tab="TasksTab">
-            <span class="nav-icon"><i class="fas fa-list-check"></i></span>
-            <span>Tasks</span>
+        <button class="nav-button" type="button" data-tab="PermitsTab">
+            <span class="nav-icon"><i class="fas fa-id-card-clip"></i></span>
+            <span>Permits</span>
         </button>
         <button class="nav-button" type="button" data-tab="JSATab">
             <span class="nav-icon"><i class="fas fa-handshake"></i></span>
