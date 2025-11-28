@@ -238,6 +238,33 @@ body.dark-mode #emergencyQuickButton {
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
 }
 
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.news-toggle {
+    width: 38px;
+    height: 38px;
+    border-radius: 999px;
+    border: 2px solid rgba(255, 255, 255, 0.45);
+    background: rgba(15, 23, 42, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #bfdbfe;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.news-toggle:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+    background: rgba(15, 23, 42, 0.75);
+}
+
 /* =========================================
    TABS & NAV
    ========================================= */
@@ -473,7 +500,7 @@ body.dark-mode #emergencyQuickButton {
 
 .home-env-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.75rem;
     margin-top: 0.25rem;
 }
@@ -750,7 +777,8 @@ body.dark-mode .month-color-line {
 #obsFilterRisk,
 #obsFilterStatus,
 #permitsAreaFilter,
-#permitsTypeFilter {
+#permitsTypeFilter,
+#tbtAreaFilter {
     flex: 1;
     border-radius: 999px;
     border: 1px solid rgba(148, 163, 184, 0.7);
@@ -759,7 +787,8 @@ body.dark-mode .month-color-line {
 }
 
 #obsSearch,
-#permitsSearch {
+#permitsSearch,
+#tbtSearch {
     width: 100%;
     border-radius: 999px;
     border: 1px solid rgba(148, 163, 184, 0.7);
@@ -843,6 +872,63 @@ body.dark-mode .obs-card .obs-description {
     align-items: center;
     margin-bottom: 0.2rem;
 }
+.obs-card-badges {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.badge {
+    border-radius: 999px;
+    padding: 0.12rem 0.55rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+/* RA level badges on observation cards */
+.badge-high {
+    background: #cc2900;   /* High */
+    color: #ffffff;
+}
+
+.badge-medium {
+    background: #ff6600;   /* Medium */
+    color: #ffffff;
+}
+
+.badge-low {
+    background: #00b300;   /* Low */
+    color: #ffffff;
+}
+
+.badge-neutral {
+    background: rgba(148, 163, 184, 0.18);
+    color: #111827;
+}
+
+/* Status pills on observation cards */
+.status-pill {
+    border-radius: 999px;
+    padding: 0.12rem 0.55rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.status-pill.status-open {
+    background: #00b300;   /* Open */
+    color: #ffffff;
+}
+
+.status-pill.status-closed {
+    background: #cc2900;   /* Closed */
+    color: #ffffff;
+}
+
+.status-pill.status-other {
+    background: rgba(148, 163, 184, 0.18);
+    color: #111827;
+}
+
 
 .obs-card-title {
     font-size: 0.82rem;
@@ -885,39 +971,41 @@ body.dark-mode .obs-card .obs-description {
 
 /* Permits: Work Permit Type chips */
 .obs-chip.permit-type-hot {
-    background: #ef4444;
-    border-color: #ef4444;
+    background: #cc2900;
+    border-color: #cc2900;
     color: #ffffff;
 }
 
 .obs-chip.permit-type-cold {
-    background: rgba(59, 130, 246, 0.20);
-    border-color: #3b82f6;
-    color: #dbeafe;
+    background: #005ce6;
+    border-color: #005ce6;
+    color: #ffffff;
 }
 
 .obs-chip.permit-type-opening {
     /* Equipment Opening / Line Break */
-    background: rgba(234, 179, 8, 0.20);
-    border-color: #eab308;
-    color: #fef9c3;
+    background: #ffff00;
+    border-color: #ffff00;
+    color: #000000;
 }
 
 .obs-chip.permit-type-confined {
-    /* Confined Space Entry – gray text */
-    background: rgba(15, 23, 42, 0.85);
-    border-color: #9ca3af;
-    color: #e5e7eb;
+    /* Confined Space Entry */
+    background: #00b300;
+    border-color: #00b300;
+    color: #ffffff;
 }
 
 .obs-chip-status-Open {
-    background: rgba(248, 250, 252, 0.1);
-    border-color: #fbbf24;
+    background: #00b300;
+    border-color: #00b300;
+    color: #ffffff;
 }
 
 .obs-chip-status-Closed {
-    background: rgba(22, 163, 74, 0.25);
-    border-color: #4ade80;
+    background: #cc2900;
+    border-color: #cc2900;
+    color: #ffffff;
 }
 
 /* Empty state */
@@ -1062,30 +1150,44 @@ body.dark-mode .obs-detail-value {
 /* Responsive layout for smaller screens */
 @media (max-width: 900px) {
     .obs-detail-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 }
 
 @media (max-width: 640px) {
     .obs-detail-grid {
-        grid-template-columns: minmax(0, 1fr);
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 }
 
 /* Full sheet */
 
 .obs-open-sheet-btn {
-    width: 100%;
     margin-top: 0.7rem;
-    border-radius: 14px;
-    padding: 0.45rem 0.6rem;
+    border-radius: 999px;
+    padding: 0.55rem 1.2rem;
     border: none;
-    background: #e5f0ff;
-    color: #1d4ed8;
+    background: #22c55e;
+    color: #ffffff;
     font-size: 0.8rem;
+    font-weight: 600;
     cursor: pointer;
 }
 
+/* Anchor version (Add New Observation / Add New Permit) */
+a.obs-open-sheet-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    white-space: nowrap;
+    text-decoration: none;
+}
+
+/* Button version (Open full permits sheet) stays full-width */
+button.obs-open-sheet-btn {
+    width: 100%;
+}
 /* =========================================
    TASKS (IFRAME)
    ========================================= */
@@ -1696,13 +1798,13 @@ body.dark-mode .announcement-card {
 
 @media (max-width: 900px) {
     .obs-detail-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 }
 
 @media (max-width: 640px) {
     .obs-detail-grid {
-        grid-template-columns: minmax(0, 1fr);
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 }
 
@@ -1923,13 +2025,15 @@ a {
    ========================================= */
 
 @media (max-width: 900px) {
-    .home-kpi-row,
-    .obs-summary-bar {
+    .home-kpi-row {
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
-    .library-layout {
-        grid-template-columns: minmax(0, 1fr);
+    .obs-summary-bar {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+.library-layout {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
     .add-observation-btn,
@@ -2136,7 +2240,216 @@ body.dark-mode .obs-evidence-chip {
 
 @media (max-width: 800px) {
     .tools-kpi-row {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         row-gap: 0.75rem;
     }
+}
+
+
+/* Risk Matrix result panel */
+.risk-result-panel {
+    margin-top: 0.75rem;
+    padding: 0.9rem 1rem;
+    border-radius: 1.1rem;
+    background: radial-gradient(circle at top left, rgba(56, 189, 248, 0.18), transparent 55%),
+                radial-gradient(circle at bottom right, rgba(251, 146, 60, 0.22), transparent 55%),
+                #0f172a;
+    color: #e5e7eb;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.55);
+}
+
+.risk-result-main {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.risk-score-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.risk-result-label {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.9;
+}
+
+.risk-score-big {
+    font-size: 1.8rem;
+    font-weight: 700;
+}
+
+.risk-meta-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.3rem;
+}
+
+.risk-level-chip {
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border: 1px solid transparent;
+}
+
+.risk-code-pill {
+    padding: 0.2rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px dashed rgba(148, 163, 184, 0.7);
+}
+
+.risk-guidance-text {
+    margin-top: 0.65rem;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    color: #d1d5db;
+}
+
+/* Level-specific colors */
+.risk-level-low {
+    background: rgba(22, 163, 74, 0.18);
+    color: #bbf7d0;
+    border-color: rgba(22, 163, 74, 0.8);
+}
+
+.risk-level-medium {
+    background: rgba(234, 179, 8, 0.2);
+    color: #fef9c3;
+    border-color: rgba(234, 179, 8, 0.85);
+}
+
+.risk-level-high {
+    background: rgba(239, 68, 68, 0.22);
+    color: #fee2e2;
+    border-color: rgba(239, 68, 68, 0.9);
+}
+
+.risk-level-critical {
+    background: rgba(127, 29, 29, 0.92);
+    color: #fee2e2;
+    border-color: rgba(248, 113, 113, 1);
+}
+
+/* Stack nicely on very small screens */
+@media (max-width: 480px) {
+    .risk-result-main {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .risk-meta-block {
+        align-items: flex-start;
+    }
+}
+
+
+/* News overlay panel */
+.news-panel {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: none;
+    align-items: stretch;
+    justify-content: center;
+    background: radial-gradient(circle at top, rgba(15, 23, 42, 0.94), rgba(15, 23, 42, 0.98));
+    backdrop-filter: blur(8px);
+}
+
+.news-panel.open {
+    display: flex;
+}
+
+.news-panel-inner {
+    width: 100%;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 1.1rem 1.2rem 1.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    color: #e5e7eb;
+}
+
+.news-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.news-panel-header h2 {
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.news-back-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.9);
+    background: rgba(15, 23, 42, 0.9);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #e5e7eb;
+    cursor: pointer;
+}
+
+.news-panel-body {
+    flex: 1;
+    overflow-y: auto;
+    max-height: calc(100vh - 5rem);
+}
+
+/* Keep announcement cards readable on dark background */
+body.dark-mode .news-panel-body .announcement-card {
+    background: rgba(15, 23, 42, 0.9);
+    border-color: rgba(51, 65, 85, 0.9);
+}
+
+body.light-mode .news-panel-body .announcement-card {
+    background: #ffffff;
+    border-color: rgba(148, 163, 184, 0.45);
+}
+
+
+/* Theme-aware news panel */
+body.light-mode .news-panel {
+    background: radial-gradient(circle at top, rgba(248, 250, 252, 0.96), rgba(241, 245, 249, 0.98));
+}
+
+body.dark-mode .news-panel {
+    background: radial-gradient(circle at top, rgba(15, 23, 42, 0.94), rgba(15, 23, 42, 0.98));
+}
+
+body.light-mode .news-panel-inner {
+    color: #0f172a;
+}
+
+body.dark-mode .news-panel-inner {
+    color: #e5e7eb;
+}
+
+body.light-mode .news-back-btn {
+    background: #ffffff;
+    color: #0f172a;
+    border-color: rgba(148, 163, 184, 0.8);
+}
+
+body.dark-mode .news-back-btn {
+    background: rgba(15, 23, 42, 0.9);
+    color: #e5e7eb;
+}
+
+/* Make news cards a bit larger / more spacious inside overlay */
+.news-panel-body .announcement-card {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
 }
