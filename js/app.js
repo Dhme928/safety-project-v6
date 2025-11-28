@@ -209,6 +209,7 @@ function parseCSV(text) {
     if (tabId === 'PermitsTab' && !permitsInitialized) {
       permitsInitialized = true;
       loadPermits();
+      setupPermitsFilters();
     }
   }
 
@@ -1633,39 +1634,35 @@ function calculateWindSafety() {
   window.calculateWindSafety = calculateWindSafety;
 
   function setupTools() {
-    const kpiBtn = document.querySelector('[data-tool="kpi"]');
     const riskBtn = document.querySelector('[data-tool="risk"]');
     const heatBtn = document.querySelector('[data-tool="heat"]'); // Calculators
 
-    const kpiSection = $('#kpiSection');
     const riskSection = $('#riskMatrixSection');
     const heatSection = $('#heatStressSection');
     const windSection = $('#windSpeedSection');
 
     function setActive(tool) {
-      [kpiBtn, riskBtn, heatBtn].forEach(btn => btn && btn.classList.remove('active-tool'));
+      [riskBtn, heatBtn].forEach(btn => btn && btn.classList.remove('active-tool'));
 
-      if (tool === 'kpi' && kpiBtn) kpiBtn.classList.add('active-tool');
       if (tool === 'risk' && riskBtn) riskBtn.classList.add('active-tool');
       if (tool === 'heat' && heatBtn) heatBtn.classList.add('active-tool');
 
-      if (kpiSection) kpiSection.style.display = tool === 'kpi' ? 'block' : 'none';
-      if (riskSection) riskSection.style.display = tool === 'risk' ? 'block' : 'none';
-
+      const showRisk = tool === 'risk';
       const showCalculators = tool === 'heat';
+
+      if (riskSection) riskSection.style.display = showRisk ? 'block' : 'none';
       if (heatSection) heatSection.style.display = showCalculators ? 'block' : 'none';
       if (windSection) windSection.style.display = showCalculators ? 'block' : 'none';
     }
 
-    if (kpiBtn) kpiBtn.addEventListener('click', () => setActive('kpi'));
     if (riskBtn) riskBtn.addEventListener('click', () => setActive('risk'));
     if (heatBtn) heatBtn.addEventListener('click', () => setActive('heat'));
 
     // expose for any old inline onclick
     window.switchTool = setActive;
 
-    // default view: Daily Snapshot
-    setActive('kpi');
+    // default view: Risk Matrix
+    setActive('risk');
   }
 
 // -------------------- Permits (CSV) --------------------
@@ -1764,6 +1761,11 @@ async function loadPermits() {
 
     state.permits = permits;
     state.permitsLoaded = true;
+
+    // Refresh home KPIs now that permits are loaded
+    if (typeof updateHomeFromObservations === 'function') {
+      updateHomeFromObservations();
+    }
 
     buildPermitsFilterOptions();
     renderPermitsList();
@@ -2080,10 +2082,77 @@ function showPermitDetail(permit) {
   modal.classList.add('show');
 }
 
+function showToolboxDetail(talk) {
+  const modal = $('#toolboxDetailModal');
+  const body = $('#toolboxDetailBody');
+  if (!modal || !body) return;
+
+  const dateText = talk.date
+    ? talk.date.toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      })
+    : (talk.dateRaw || '');
+
+  const row = (label, value) => {
+    if (!value) return '';
+    return `
+      <div class="obs-detail-row">
+        <div class="obs-detail-label">${label}</div>
+        <div class="obs-detail-value">${value}</div>
+      </div>
+    `;
+  };
+
+  // Evidence: if evidence looks like a URL, make it clickable
+  const evidenceRaw = (talk.evidence || '').trim();
+  let evidenceSection = '';
+  if (evidenceRaw) {
+    const isUrl = /^https?:\/\//i.test(evidenceRaw);
+    const content = isUrl
+      ? `<a href="${escapeHtml(evidenceRaw)}" target="_blank" rel="noopener">Open evidence photo</a>`
+      : escapeHtml(evidenceRaw);
+
+    evidenceSection = `
+      <section class="obs-detail-section">
+        <div class="obs-detail-section-title">Evidence</div>
+        <div class="obs-detail-description-box">
+          ${content}
+        </div>
+      </section>
+    `;
+  }
+
+  body.innerHTML = `
+    <section class="obs-detail-section">
+      <div class="obs-detail-section-title">Overview</div>
+      <div class="obs-detail-grid">
+        ${row('Date', escapeHtml(dateText))}
+        ${row('Area / Location', escapeHtml(talk.area || ''))}
+        ${row('Topic', escapeHtml(talk.topic || ''))}
+        ${row('No. of Attendance', talk.attendance != null ? escapeHtml(String(talk.attendance)) : '')}
+      </div>
+    </section>
+
+    ${evidenceSection}
+  `;
+
+  modal.classList.add('show');
+}
+
+function hideToolboxDetailModal() {
+  const modal = $('#toolboxDetailModal');
+  if (modal) modal.classList.remove('show');
+}
+
+
 function hidePermitDetailModal() {
   const modal = $('#permitDetailModal');
   if (modal) modal.classList.remove('show');
 }
+
+window.hideToolboxDetailModal = hideToolboxDetailModal;
 
 window.hidePermitDetailModal = hidePermitDetailModal;
 
@@ -2224,26 +2293,23 @@ async function loadObservations() {
 }
 
 function updateHomeFromObservations() {
-  const obs = state.observations;
-  if (!obs.length) return;
+  const obs = state.observations || [];
+  const permits = state.permits || [];
+
+  if (!obs.length && !permits.length) return;
+
   const today = startOfDay(new Date());
 
   const todayObs = obs.filter(o => o.date && isSameDay(o.date, today));
-  const observersToday = new Set(todayObs.map(o => o.reporter).filter(Boolean)).size;
-  const highRiskOpen = obs.filter(o => {
-    const level = (o.raLevel || '').toLowerCase();
-    const status = (o.status || '').toLowerCase();
-    return level.includes('high') && !status.includes('close');
-  }).length;
+  const todayPermits = permits.filter(p => p.date && isSameDay(p.date, today));
 
-  const observersEl = $('#homeObserversToday');
   const obsTodayEl = $('#homeObservationsToday');
-  const highRiskEl = $('#homeHighRiskOpen');
+  const permitsTodayEl = $('#homePermitsToday');
 
-  if (observersEl) observersEl.textContent = observersToday || '--';
   if (obsTodayEl) obsTodayEl.textContent = todayObs.length || '--';
-  if (highRiskEl) highRiskEl.textContent = highRiskOpen || '0';
+  if (permitsTodayEl) permitsTodayEl.textContent = todayPermits.length || '--';
 }
+
 
 
 function updateToolsSnapshot() {
@@ -2618,6 +2684,71 @@ function showObservationDetail(obs) {
   modal.classList.add('show');
 }
 
+function showToolboxDetail(talk) {
+  const modal = $('#toolboxDetailModal');
+  const body = $('#toolboxDetailBody');
+  if (!modal || !body) return;
+
+  const dateText = talk.date
+    ? talk.date.toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      })
+    : (talk.dateRaw || '');
+
+  const row = (label, value) => {
+    if (!value) return '';
+    return `
+      <div class="obs-detail-row">
+        <div class="obs-detail-label">${label}</div>
+        <div class="obs-detail-value">${value}</div>
+      </div>
+    `;
+  };
+
+  // Evidence: if evidence looks like a URL, make it clickable
+  const evidenceRaw = (talk.evidence || '').trim();
+  let evidenceSection = '';
+  if (evidenceRaw) {
+    const isUrl = /^https?:\/\//i.test(evidenceRaw);
+    const content = isUrl
+      ? `<a href="${escapeHtml(evidenceRaw)}" target="_blank" rel="noopener">Open evidence photo</a>`
+      : escapeHtml(evidenceRaw);
+
+    evidenceSection = `
+      <section class="obs-detail-section">
+        <div class="obs-detail-section-title">Evidence</div>
+        <div class="obs-detail-description-box">
+          ${content}
+        </div>
+      </section>
+    `;
+  }
+
+  body.innerHTML = `
+    <section class="obs-detail-section">
+      <div class="obs-detail-section-title">Overview</div>
+      <div class="obs-detail-grid">
+        ${row('Date', escapeHtml(dateText))}
+        ${row('Area / Location', escapeHtml(talk.area || ''))}
+        ${row('Topic', escapeHtml(talk.topic || ''))}
+        ${row('No. of Attendance', talk.attendance != null ? escapeHtml(String(talk.attendance)) : '')}
+      </div>
+    </section>
+
+    ${evidenceSection}
+  `;
+
+  modal.classList.add('show');
+}
+
+function hideToolboxDetailModal() {
+  const modal = $('#toolboxDetailModal');
+  if (modal) modal.classList.remove('show');
+}
+
+
 function hideObservationDetailModal() {
   const modal = $('#observationDetailModal');
   if (modal) modal.classList.remove('show');
@@ -2704,13 +2835,18 @@ window.hideObservationDetailModal = hideObservationDetailModal;
         const contentEl = card.querySelector('.card-content');
         const icon = card.querySelector('.toggle-icon');
 
-        if (!titleEl || !contentEl) return;
+        if (!contentEl || card.classList.contains('no-details')) {
+          // no-details cards just show static text
+          return;
+        }
 
         // start collapsed
         card.classList.remove('open');
         contentEl.style.display = 'none';
 
-        titleEl.addEventListener('click', () => {
+        const clickTarget = titleEl || card;
+
+        clickTarget.addEventListener('click', () => {
           const isOpen = card.classList.toggle('open');
           contentEl.style.display = isOpen ? 'block' : 'none';
           if (icon) icon.classList.toggle('rotated', isOpen);
@@ -2731,8 +2867,289 @@ window.hideObservationDetailModal = hideObservationDetailModal;
     }
   }
 
+function setupNewsPanel() {
+  const toggleBtn = document.getElementById('newsToggleButton');
+  const panel = document.getElementById('NewsPanel');
+  const backBtn = document.getElementById('newsBackButton');
 
-  // -------------------- Tasks iframe (lazy load) --------------------
+  if (!toggleBtn || !panel) return;
+
+  const openPanel = () => {
+    panel.classList.add('open');
+    panel.setAttribute('aria-hidden', 'false');
+  };
+
+  const closePanel = () => {
+    panel.classList.remove('open');
+    panel.setAttribute('aria-hidden', 'true');
+  };
+
+  toggleBtn.addEventListener('click', openPanel);
+  if (backBtn) {
+    backBtn.addEventListener('click', closePanel);
+  }
+}
+
+
+
+  
+// -------------------- Toolbox Talks --------------------
+
+const toolboxFilterState = {
+  range: 'today',
+  area: '',
+  search: ''
+};
+
+async function loadToolboxTalks() {
+  const url = window.TBT_SHEET_CSV_URL ||
+    'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ5EYzYhv5Br98EGb_rMGGOKvtb3lRX-5R0s-DBcTdwFgEPtWwV2YTBKxpuZl0yqvf2vnyQilL5SvuL/pub?output=csv';
+
+  const list = $('#tbtList');
+  const emptyState = $('#tbtEmptyState');
+  const totalEl = $('#tbtCountTotal');
+  const areasEl = $('#tbtCountAreas');
+  const attendanceEl = $('#tbtCountAttendance');
+
+  if (!list) return;
+
+  if (emptyState) emptyState.style.display = 'none';
+  list.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading toolbox talks...</div>';
+
+  if (!url) {
+    list.innerHTML = '<p class="text-muted">No toolbox talk sheet configured. Set TBT_SHEET_CSV_URL in js/data.js.</p>';
+    if (emptyState) {
+      emptyState.style.display = 'block';
+      const p = emptyState.querySelector('p');
+      if (p) p.textContent = 'No toolbox talk sheet configured. Set TBT_SHEET_CSV_URL in js/data.js.';
+    }
+    return;
+  }
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    const rows = parseCSV(text);
+    if (!rows.length) throw new Error('Empty sheet');
+
+    const headers = rows[0];
+    const body = rows.slice(1).filter(r => r.some(c => c && c.trim() !== ''));
+
+    const idxDate = findColumnIndex(headers, ['Date']);
+    const idxArea = findColumnIndex(headers, ['Area / Location', 'Area', 'Location']);
+    const idxTopic = findColumnIndex(headers, ['Topic', 'Subject']);
+    const idxAttendance = findColumnIndex(headers, ['No. of Attendance', 'Attendance', 'No. Attendance']);
+    const idxEvidence = findColumnIndex(headers, ['Evidence photo', 'Evidence', 'Photo']);
+
+    const talks = body.map((row, index) => {
+      const dateRaw = idxDate !== -1 ? (row[idxDate] || '') : '';
+      const date = parseSheetDate(dateRaw);
+      const area = idxArea !== -1 ? (row[idxArea] || '') : '';
+      const topic = idxTopic !== -1 ? (row[idxTopic] || '') : '';
+      const attendanceRaw = idxAttendance !== -1 ? (row[idxAttendance] || '') : '';
+      const attendance = attendanceRaw ? Number(attendanceRaw) || 0 : 0;
+      const evidence = idxEvidence !== -1 ? (row[idxEvidence] || '') : '';
+
+      return {
+        _index: index,
+        dateRaw,
+        date,
+        area,
+        topic,
+        attendance,
+        evidence
+      };
+    });
+
+    state.toolboxTalks = talks;
+
+    const totalTalks = talks.length;
+    const today = startOfDay(new Date());
+    const todayTalks = talks.filter(t => t.date && isSameDay(t.date, today));
+    const areas = Array.from(new Set(talks.map(t => (t.area || '').trim()).filter(Boolean)));
+    const totalAttendance = talks.reduce((sum, t) => sum + (t.attendance || 0), 0);
+
+    if (totalEl) totalEl.textContent = String(totalTalks);
+    if (areasEl) areasEl.textContent = String(areas.length || 0);
+    if (attendanceEl) attendanceEl.textContent = String(totalAttendance);
+
+    buildToolboxFilterOptions();
+    renderToolboxList();
+  } catch (err) {
+    console.error('Toolbox load error:', err);
+    list.innerHTML = '<p class="text-muted">Failed to load toolbox talks.</p>';
+    if (emptyState) emptyState.style.display = 'block';
+  }
+}
+
+function buildToolboxFilterOptions() {
+  const talks = state.toolboxTalks || [];
+  const areaSelect = $('#tbtAreaFilter');
+
+  if (!areaSelect) return;
+
+  const areas = Array.from(
+    new Set(talks.map(t => (t.area || '').trim()).filter(Boolean))
+  ).sort((a, b) => a.localeCompare(b));
+
+  areaSelect.innerHTML = '<option value="">All Areas</option>' + areas
+    .map(a => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`)
+    .join('');
+}
+
+function renderToolboxList() {
+  const list = $('#tbtList');
+  const emptyState = $('#tbtEmptyState');
+  const filterChips = $all('.tbt-filter-chip');
+  const areaSelect = $('#tbtAreaFilter');
+  const searchInput = $('#tbtSearch');
+
+  if (!list) return;
+
+  const talks = state.toolboxTalks || [];
+  if (!talks.length) {
+    list.innerHTML = '<p class="text-muted">No toolbox talks loaded yet.</p>';
+    if (emptyState) emptyState.style.display = 'block';
+    return;
+  }
+
+  let filtered = talks.slice();
+
+  const now = new Date();
+  const range = toolboxFilterState.range || 'today';
+
+  filtered = filtered.filter(t => {
+    if (!t.date) return false;
+
+    const sameDay = t.date.getFullYear() === now.getFullYear() &&
+      t.date.getMonth() === now.getMonth() &&
+      t.date.getDate() === now.getDate();
+
+    const diffDays = (now - t.date) / (1000 * 60 * 60 * 24);
+
+    if (range === 'today') return sameDay;
+    if (range === 'week') return diffDays <= 7;
+    if (range === 'month') return diffDays <= 31;
+    return true; // all
+  });
+
+  if (toolboxFilterState.area) {
+    const needle = toolboxFilterState.area.toLowerCase();
+    filtered = filtered.filter(t => (t.area || '').toLowerCase() === needle);
+  }
+
+  if (toolboxFilterState.search) {
+    const s = toolboxFilterState.search.toLowerCase();
+    filtered = filtered.filter(t => {
+      return (t.area || '').toLowerCase().includes(s) ||
+             (t.topic || '').toLowerCase().includes(s);
+    });
+  }
+
+  if (!filtered.length) {
+    list.innerHTML = '<p class="text-muted">No toolbox talks match the current filters.</p>';
+    if (emptyState) emptyState.style.display = 'block';
+    return;
+  }
+
+  if (emptyState) emptyState.style.display = 'none';
+
+  list.innerHTML = filtered.map(t => {
+    const dateText = t.date
+      ? t.date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+      : (t.dateRaw || '');
+
+    const attendanceText = t.attendance ? `Attendance: ${t.attendance}` : '';
+    const evidenceIcon = t.evidence
+      ? '<span class="obs-evidence-chip" title="Evidence attached"><i class="fas fa-image"></i></span>'
+      : '';
+
+    return `
+      <article class="obs-card tbt-card" data-tbt-index="${t._index}">
+        <header class="obs-card-header">
+          <div class="obs-card-date">${escapeHtml(dateText)}</div>
+          <div class="obs-card-badges">
+            ${evidenceIcon}
+            ${t.area ? `<span class="obs-chip">${escapeHtml(t.area)}</span>` : ''}
+          </div>
+        </header>
+        <div class="obs-card-body">
+          <h3 class="obs-card-title">${escapeHtml(t.topic || 'No topic')}</h3>
+          ${attendanceText ? `<p class="obs-description">${escapeHtml(attendanceText)}</p>` : ''}
+        </div>
+      </article>
+    `;
+  }).join('');
+
+  // Wire click to open toolbox talk detail
+  list.querySelectorAll('.tbt-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const idxStr = card.getAttribute('data-tbt-index');
+      const idx = parseInt(idxStr, 10);
+      if (Number.isNaN(idx)) return;
+      const talksArr = state.toolboxTalks || [];
+      const talk = talksArr[idx];
+      if (talk) {
+        showToolboxDetail(talk);
+      }
+    });
+  });
+
+  // Keep UI state in sync
+  if (filterChips && filterChips.length) {
+    filterChips.forEach(chip => {
+      chip.classList.toggle('active', chip.dataset.range === toolboxFilterState.range);
+    });
+  }
+
+  if (areaSelect && areaSelect.value !== toolboxFilterState.area) {
+    areaSelect.value = toolboxFilterState.area;
+  }
+
+  if (searchInput && searchInput.value !== toolboxFilterState.search) {
+    searchInput.value = toolboxFilterState.search;
+  }
+
+  // Wire events once
+  if (!renderToolboxList._wired) {
+    if (filterChips && filterChips.length) {
+      filterChips.forEach(chip => {
+        chip.addEventListener('click', () => {
+          toolboxFilterState.range = chip.dataset.range || 'today';
+          renderToolboxList();
+        });
+      });
+    }
+
+    if (areaSelect) {
+      areaSelect.addEventListener('change', () => {
+        toolboxFilterState.area = areaSelect.value || '';
+        renderToolboxList();
+      });
+    }
+
+    if (searchInput) {
+      searchInput.addEventListener('input', () => {
+        toolboxFilterState.search = searchInput.value || '';
+        renderToolboxList();
+      });
+    }
+
+    const openSheetBtn = $('#tbtOpenSheetButton');
+    if (openSheetBtn) {
+      openSheetBtn.addEventListener('click', () => {
+        const url = window.TBT_FULL_SHEET_URL ||
+          window.TBT_SHEET_CSV_URL ||
+          'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ5EYzYhv5Br98EGb_rMGGOKvtb3lRX-5R0s-DBcTdwFgEPtWwV2YTBKxpuZl0yqvf2vnyQilL5SvuL/pub?output=csv';
+        window.open(url, '_blank', 'noopener,noreferrer');
+      });
+    }
+
+    renderToolboxList._wired = true;
+  }
+}
+// -------------------- Tasks iframe (lazy load) --------------------
 
  let tasksIframeInitialized = false;
 
@@ -2777,8 +3194,8 @@ function initTasksIframe() {
         (iframe && iframe.dataset && iframe.dataset.src ? iframe.dataset.src : '');
 
       if (directUrl) {
-        // Navigate to the daily tasks form in the same tab
-        window.location.href = directUrl;
+        // Open the daily tasks form in a new tab, same behavior as Add New Observation
+        window.open(directUrl, '_blank', 'noopener,noreferrer');
       } else {
         // Fallback: open the Tasks tab inside the app
         openTab(null, 'TasksTab');
@@ -2804,10 +3221,31 @@ function initTasksIframe() {
       const sevVal = sevSel.value || '';
       const result = computeRiskMatrix(likeVal, sevVal);
 
-      if (scoreEl) scoreEl.textContent = result.score != null ? String(result.score) : '--';
-      if (levelEl) levelEl.textContent = result.level || '--';
-      if (codeEl) codeEl.textContent = result.code || '--';
-      if (guidanceEl) guidanceEl.textContent = result.guidance || 'Select likelihood and severity to see guidance.';
+      if (scoreEl) {
+        scoreEl.textContent = result.score != null ? String(result.score) : '--';
+      }
+
+      if (levelEl) {
+        const levelText = result.level || '--';
+        levelEl.textContent = levelText;
+
+        // reset level classes
+        levelEl.classList.remove('risk-level-low', 'risk-level-medium', 'risk-level-high', 'risk-level-critical');
+
+        const normalized = (levelText || '').toLowerCase();
+        if (normalized === 'low') levelEl.classList.add('risk-level-low');
+        if (normalized === 'medium') levelEl.classList.add('risk-level-medium');
+        if (normalized === 'high') levelEl.classList.add('risk-level-high');
+        if (normalized === 'critical') levelEl.classList.add('risk-level-critical');
+      }
+
+      if (codeEl) {
+        codeEl.textContent = result.code || '--';
+      }
+
+      if (guidanceEl) {
+        guidanceEl.textContent = result.guidance || 'Select likelihood and severity to see guidance.';
+      }
     };
 
     likeSel.addEventListener('change', recompute);
@@ -2816,30 +3254,33 @@ function initTasksIframe() {
 
 
 function initApp() {
-setupDarkMode();
-    setupNav();
-    setupAccordions();
-    setupModals();
-    setupAddObservationButton();
-    setupDailyTasksButton();
-    setupTbtOfDay();
-    setupTbtLibrary();
-    setupJsaLibrary();
-    setupCsmLibrary();
-setupLibrarySwitcher();   // 👈 NEW
-    setupTools();
-    setupRiskMatrix();
-    loadEomAndLeaderboard();
-    loadObservations();
-    loadNews();
+  setupDarkMode();
+  setupNav();
+  setupAccordions();
+  setupModals();
+  setupAddObservationButton();
+  setupDailyTasksButton();
+  setupTbtOfDay();
+  setupTbtLibrary();
+  setupJsaLibrary();
+  setupCsmLibrary();
+  setupLibrarySwitcher();
+  setupTools();
+  setupRiskMatrix();
+  setupNewsPanel();
+  loadEomAndLeaderboard();
+  loadObservations();
+  loadPermits();
+  loadToolboxTalks();
+  loadNews();
 
+  // If we already have summaries from tools, reflect in Home
+  const homeHeat = $('#homeHeatSummary');
+  const homeWind = $('#homeWindSummary');
+  if (homeHeat && state.lastHeatSummary) homeHeat.textContent = state.lastHeatSummary;
+  if (homeWind && state.lastWindSummary) homeWind.textContent = state.lastWindSummary;
+}
 
-    // If we already have summaries from tools, reflect in Home
-    const homeHeat = $('#homeHeatSummary');
-    const homeWind = $('#homeWindSummary');
-    if (homeHeat && state.lastHeatSummary) homeHeat.textContent = state.lastHeatSummary;
-    if (homeWind && state.lastWindSummary) homeWind.textContent = state.lastWindSummary;
-  }
 
   document.addEventListener('DOMContentLoaded', initApp);
 })();
