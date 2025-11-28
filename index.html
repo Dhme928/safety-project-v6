@@ -39,9 +39,14 @@
                 <p class="header-subtitle">By Saudi Safety Group</p>
             </div>
         </div>
-        <button class="mode-toggle" type="button" aria-label="Toggle dark mode">
-            <i id="modeIcon" class="fas fa-moon"></i>
-        </button>
+        <div class="header-actions">
+            <button class="news-toggle" type="button" aria-label="Open news" id="newsToggleButton">
+                <i class="fas fa-bullhorn"></i>
+            </button>
+            <button class="mode-toggle" type="button" aria-label="Toggle dark mode">
+                <i id="modeIcon" class="fas fa-moon"></i>
+            </button>
+        </div>
     </header>
 
     <!-- LEADERBOARD MODAL -->
@@ -132,16 +137,16 @@
         <section id="HomeTab" class="tab-content active">
             <div class="home-kpi-row">
                 <div class="home-kpi-card">
-                    <div class="home-kpi-label">Observers Today</div>
-                    <div class="home-kpi-value" id="homeObserversToday">--</div>
-                </div>
-                <div class="home-kpi-card">
                     <div class="home-kpi-label">Observations Today</div>
                     <div class="home-kpi-value" id="homeObservationsToday">--</div>
                 </div>
                 <div class="home-kpi-card">
-                    <div class="home-kpi-label">Open High-Risk</div>
-                    <div class="home-kpi-value" id="homeHighRiskOpen">--</div>
+                    <div class="home-kpi-label">Permits Today</div>
+                    <div class="home-kpi-value" id="homePermitsToday">--</div>
+                </div>
+                <div class="home-kpi-card">
+                    <div class="home-kpi-label">Talks Today</div>
+                    <div class="home-kpi-value" id="homeTalksToday">--</div>
                 </div>
             </div>
 
@@ -159,35 +164,7 @@
             </p>
 
 
-            <section class="home-card">
-                <header class="home-card-header">
-                    <h3><i class="fas fa-temperature-high"></i> Environment Status</h3>
-                    <button
-                        type="button"
-                        class="gps-btn home-env-location-btn"
-                        id="envEnableGeo"
-                        onclick="askGeoAndLoadWeather()"
-                    >
-                        <i class="fas fa-location-crosshairs"></i>
-                        Use my location
-                    </button>
-                </header>
-                <div class="home-env-grid">
-                    <div class="home-env-card">
-                        <div class="home-env-label">Heat Index</div>
-                        <div class="home-env-value" id="homeHeatSummary">--</div>
-                    </div>
-                    <div class="home-env-card">
-                        <div class="home-env-label">Wind</div>
-                        <div class="home-env-value" id="homeWindSummary">--</div>
-                    </div>
-                </div>
-                <p class="home-env-hint" id="homeEnvHint">
-                    Click <strong>Use my location</strong> to load current Heat Index and Wind
-                    for your approximate area. Always confirm with site instruments and your
-                    HSSE procedures before making safety decisions.
-                </p>
-            </section>
+            
 
 
             <section class="home-card highlight-card">
@@ -375,6 +352,18 @@
                 <div class="obs-filter-row">
                     <input type="text" id="obsSearch" placeholder="Search by location, type, reporter..." />
                 </div>
+
+                <div class="obs-filter-row" style="justify-content: center;">
+                    <a
+                        id="addObservationButton"
+                        class="obs-open-sheet-btn"
+                        href="#"
+                        target="_blank"
+                    >
+                        <i class="fas fa-plus-circle"></i>
+                        Add New Observation
+                    </a>
+                </div>
             </div>
 
             <div id="observationsList"></div>
@@ -425,7 +414,7 @@
                 <div class="obs-filter-row">
                     <input type="text" id="permitsSearch" placeholder="Search by area, type, receiver, project, permit #..." />
                 </div>
-                <div class="obs-filter-row" style="justify-content: flex-start;">
+                <div class="obs-filter-row" style="justify-content: center;">
                     <a
                         id="addPermitButton"
                         class="obs-open-sheet-btn"
@@ -451,6 +440,65 @@
                 <p>No permits data loaded yet.</p>
             </div>
         </section>
+        <!-- TOOLBOX TALK TAB -->
+        <section id="ToolboxTab" class="tab-content">
+            <div class="obs-summary-bar">
+                <div class="obs-summary-item">
+                    <div class="obs-summary-label">Total Talks</div>
+                    <div class="obs-summary-value" id="tbtCountTotal">--</div>
+                </div>
+                <div class="obs-summary-item">
+                    <div class="obs-summary-label">Areas Covered</div>
+                    <div class="obs-summary-value" id="tbtCountAreas">--</div>
+                </div>
+                <div class="obs-summary-item">
+                    <div class="obs-summary-label">Attendance (Total)</div>
+                    <div class="obs-summary-value" id="tbtCountAttendance">--</div>
+                </div>
+            </div>
+
+            <div class="obs-filters">
+                <div class="obs-filter-row">
+                    <button class="obs-filter-chip tbt-filter-chip active" data-range="today">Today</button>
+                    <button class="obs-filter-chip tbt-filter-chip" data-range="week">This Week</button>
+                    <button class="obs-filter-chip tbt-filter-chip" data-range="month">This Month</button>
+                    <button class="obs-filter-chip tbt-filter-chip" data-range="all">All</button>
+                </div>
+                <div class="obs-filter-row">
+                    <select id="tbtAreaFilter">
+                        <option value="">All Areas</option>
+                    </select>
+                </div>
+                <div class="obs-filter-row">
+                    <input type="text" id="tbtSearch" placeholder="Search by area, topic..." />
+                </div>
+                <div class="obs-filter-row" style="justify-content: center;">
+                    <a
+                        id="addTbtButton"
+                        class="obs-open-sheet-btn"
+                        href="https://forms.gle/8EVSNdjMgitUQL899"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        <i class="fas fa-plus-circle"></i>
+                        Add New Toolbox Talk
+                    </a>
+                </div>
+            </div>
+
+            <div id="tbtList"></div>
+
+            <button id="tbtOpenSheetButton" class="obs-open-sheet-btn" type="button">
+                <i class="fas fa-table"></i>
+                Open full toolbox talks sheet
+            </button>
+
+            <div id="tbtEmptyState" class="obs-empty-state" style="display: none;">
+                <i class="fas fa-info-circle"></i>
+                <p>No toolbox talks found for the selected filters.</p>
+            </div>
+        </section>
+
 
         <!-- TASKS TAB -->
         <section id="TasksTab" class="tab-content">
@@ -538,10 +586,7 @@
         <!-- TOOLS TAB -->
         <section id="ToolsTab" class="tab-content">
             <div class="tool-toggle-container">
-                <button class="tool-toggle-btn active-tool" type="button" data-tool="kpi">
-                    Daily Snapshot
-                </button>
-                <button class="tool-toggle-btn" type="button" data-tool="risk">
+                <button class="tool-toggle-btn active-tool" type="button" data-tool="risk">
                     Risk Matrix
                 </button>
                 <button class="tool-toggle-btn" type="button" data-tool="heat">
@@ -549,36 +594,7 @@
                 </button>
             </div>
 
-            <!-- DAILY SNAPSHOT CARD -->
-            <section id="kpiSection" class="home-card tools-card">
-                <div class="tools-section-header">
-                    <i class="fas fa-clipboard-check"></i>
-                    <div>
-                        <h3>Today on Site</h3>
-                        <small>Quick snapshot for the safety officer.</small>
-                    </div>
-                </div>
-
-                <div class="home-kpi-row tools-kpi-row">
-                    <div class="home-kpi-card">
-                        <div class="home-kpi-label">Observations Today</div>
-                        <div class="home-kpi-value" id="toolsObservationsToday">--</div>
-                    </div>
-                    <div class="home-kpi-card">
-                        <div class="home-kpi-label">Permits Today</div>
-                        <div class="home-kpi-value" id="toolsPermitsToday">--</div>
-                    </div>
-                    <div class="home-kpi-card">
-                        <div class="home-kpi-label">Open High-Risk</div>
-                        <div class="home-kpi-value" id="toolsHighRiskOpen">--</div>
-                    </div>
-                </div>
-
-                <p class="tools-note">
-                    Counts are based on today's observations and permits data.
-                </p>
-            </section>
-
+            
             
             <!-- RISK MATRIX CARD -->
             <section id="riskMatrixSection" class="home-card tools-card" style="display: none;">
@@ -615,24 +631,23 @@
                         </select>
                     </div>
 
-                    <div class="kpi-output-grid">
-                        <div class="kpi-output-item">
-                            <div class="kpi-output-label">Risk Score</div>
-                            <div class="kpi-output-value" id="riskScoreValue">--</div>
+                    <div class="risk-result-panel">
+                        <div class="risk-result-main">
+                            <div class="risk-score-block">
+                                <div class="risk-result-label">Risk Score</div>
+                                <div class="risk-score-big" id="riskScoreValue">--</div>
+                            </div>
+                            <div class="risk-meta-block">
+                                <div class="risk-level-chip" id="riskLevelLabel">--</div>
+                                <div class="risk-code-pill">
+                                    RA Code: <span id="riskCodeValue">--</span>
+                                </div>
+                            </div>
                         </div>
-                        <div class="kpi-output-item">
-                            <div class="kpi-output-label">Risk Level</div>
-                            <div class="kpi-output-value" id="riskLevelLabel">--</div>
-                        </div>
-                        <div class="kpi-output-item">
-                            <div class="kpi-output-label">RA Code</div>
-                            <div class="kpi-output-value" id="riskCodeValue">--</div>
-                        </div>
+                        <p class="risk-guidance-text" id="riskGuidanceText">
+                            Select likelihood and severity to see guidance.
+                        </p>
                     </div>
-
-                    <p class="tools-note" id="riskGuidanceText">
-                        Select likelihood and severity to see guidance.
-                    </p>
                 </div>
             </section>
 
@@ -713,14 +728,23 @@
             </section>
         </section>
 
-        <!-- NEWS TAB -->
-        <section id="NewsTab" class="tab-content">
-            <div id="AnnouncementsContainer">
-                <div id="newsLoading" class="loading-spinner">
-                    <i class="fas fa-spinner fa-spin"></i> Fetching news...
+        <!-- NEWS PANEL (opens from header icon) -->
+        <section id="NewsPanel" class="news-panel" aria-hidden="true">
+            <div class="news-panel-inner">
+                <header class="news-panel-header">
+                    <button id="newsBackButton" type="button" class="news-back-btn">
+                        <i class="fas fa-arrow-left"></i>
+                    </button>
+                    <h2>News &amp; Announcements</h2>
+                </header>
+                <div id="AnnouncementsContainer" class="news-panel-body">
+                    <div id="newsLoading" class="loading-spinner">
+                        <i class="fas fa-spinner fa-spin"></i> Fetching news...
+                    </div>
                 </div>
             </div>
         </section>
+
 
         <!-- 🔍 Observation detail modal -->
         <div id="observationDetailModal" class="modal">
@@ -745,18 +769,22 @@
             </div>
         </div>
 
+        <!-- 🧰 Toolbox Talk detail modal -->
+        <div id="toolboxDetailModal" class="modal">
+            <div class="modal-content">
+                <button class="close-btn" type="button" onclick="hideToolboxDetailModal()">
+                    &times;
+                </button>
+                <h2>Toolbox Talk Details</h2>
+                <div id="toolboxDetailBody"></div>
+            </div>
+        </div>
+
+
     </main>
 
     <!-- FLOATING BUTTONS -->
-    <a
-        id="addObservationButton"
-        class="add-observation-btn"
-        href="#"
-        target="_blank"
-    >
-        <i class="fas fa-plus"></i> Add New Observation
-    </a>
-
+    
     <button
         id="dailyTasksButton"
         class="daily-tasks-btn"
@@ -789,6 +817,10 @@
             <span class="nav-icon"><i class="fas fa-id-card-clip"></i></span>
             <span>Permits</span>
         </button>
+        <button class="nav-button" type="button" data-tab="ToolboxTab">
+            <span class="nav-icon"><i class="fas fa-chalkboard-teacher"></i></span>
+            <span>Toolbox Talk</span>
+        </button>
         <button class="nav-button" type="button" data-tab="JSATab">
             <span class="nav-icon"><i class="fas fa-handshake"></i></span>
             <span>Library</span>
@@ -796,10 +828,6 @@
         <button class="nav-button" type="button" data-tab="ToolsTab">
             <span class="nav-icon"><i class="fas fa-calculator"></i></span>
             <span>Tools</span>
-        </button>
-        <button class="nav-button" type="button" data-tab="NewsTab">
-            <span class="nav-icon"><i class="fas fa-bullhorn"></i></span>
-            <span>News</span>
         </button>
     </nav>
 </div>
