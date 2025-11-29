@@ -2458,6 +2458,121 @@ body.dark-mode .news-back-btn {
 }
 
 
+/* Library tab visual enhancements */
+.library-intro {
+    margin-bottom: 0.75rem;
+}
+
+.library-intro h2 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin-bottom: 0.15rem;
+}
+
+.library-intro p {
+    font-size: 0.85rem;
+    color: var(--text-soft);
+}
+
+.library-chooser {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.1rem;
+    align-items: stretch;
+}
+
+.library-choice-main {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+}
+
+.library-choice-meta {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.library-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.1rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    background: rgba(15, 23, 42, 0.06);
+    color: var(--text-soft);
+}
+
+.library-choice-main i {
+    font-size: 1.4rem;
+}
+
+@media (min-width: 768px) {
+    .library-chooser {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* Tools tab intro */
+.tools-intro {
+    margin-bottom: 0.65rem;
+}
+
+.tools-intro h2 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin-bottom: 0.1rem;
+}
+
+.tools-intro p {
+    font-size: 0.85rem;
+    color: var(--text-soft);
+}
+
+/* Lifesaving rules checklist visuals */
+.lifesaving-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin-top: 0.75rem;
+}
+
+.lifesaving-item {
+    flex: 1 1 45%;
+}
+
+.lifesaving-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.4rem;
+    font-size: 0.86rem;
+    font-weight: 600;
+}
+
+.lifesaving-checkbox {
+    margin-top: 0.18rem;
+}
+
+.lifesaving-note {
+    margin: 0.15rem 0 0.35rem;
+    font-size: 0.8rem;
+    color: var(--text-soft);
+}
+
+.lifesaving-footnote {
+    margin-top: 0.5rem;
+    font-size: 0.78rem;
+    color: var(--text-soft);
+}
+
+@media (min-width: 768px) {
+    .lifesaving-grid {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+}
+
+
 /* Home insights: Top 5 areas & direct causes */
 .home-insights-grid {
     display: flex;
@@ -2469,7 +2584,7 @@ body.dark-mode .news-back-btn {
 .home-insights-column h4 {
     font-size: 0.85rem;
     margin-bottom: 0.3rem;
-    color: var(--text-soft, #6b7280);
+    color: var(--text-soft);
 }
 
 .home-insights-list {
@@ -2505,48 +2620,5 @@ body.dark-mode .news-back-btn {
 @media (min-width: 768px) {
     .home-insights-grid {
         flex-direction: row;
-    }
-}
-
-/* Lifesaving rules checklist */
-.lifesaving-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
-    margin-top: 0.75rem;
-}
-
-.lifesaving-item {
-    flex: 1 1 45%;
-}
-
-.lifesaving-label {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.4rem;
-    font-size: 0.86rem;
-    font-weight: 600;
-}
-
-.lifesaving-checkbox {
-    margin-top: 0.18rem;
-}
-
-.lifesaving-note {
-    margin: 0.15rem 0 0.35rem;
-    font-size: 0.8rem;
-    color: var(--text-soft, #6b7280);
-}
-
-.lifesaving-footnote {
-    margin-top: 0.5rem;
-    font-size: 0.78rem;
-    color: var(--text-soft, #6b7280);
-}
-
-@media (min-width: 768px) {
-    .lifesaving-grid {
-        flex-direction: row;
-        flex-wrap: wrap;
     }
 }
