@@ -2537,9 +2537,6 @@ function updateHomeFromObservations() {
   if (permitsTodayEl) permitsTodayEl.textContent = todayPermits.length || '--';
 }
 
-
-
-
 function updateHomeObservationInsights() {
   const listAreas = $('#homeTopAreasList');
   const listDirect = $('#homeTopDirectCausesList');
@@ -2604,6 +2601,9 @@ function updateHomeObservationInsights() {
     }
   }
 }
+
+
+
 
 
 function updateToolsSnapshot() {
