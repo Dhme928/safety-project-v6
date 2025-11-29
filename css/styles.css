@@ -2623,3 +2623,47 @@ body.dark-mode .news-back-btn {
         flex-direction: row;
     }
 }
+
+
+/* Observation tips card under Open full data sheet */
+.obs-tips-card {
+    font-size: 0.85rem;
+}
+
+.obs-tips-header h3 {
+    font-size: 0.98rem;
+    margin-bottom: 0.15rem;
+}
+
+.obs-tips-header p {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--text-soft);
+}
+
+.obs-tips-list {
+    list-style: none;
+    padding-left: 0;
+    margin: 0.5rem 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.obs-tips-list li {
+    position: relative;
+    padding-left: 1.1rem;
+}
+
+.obs-tips-list li::before {
+    content: "•";
+    position: absolute;
+    left: 0.1rem;
+    top: 0;
+    font-size: 1rem;
+    color: var(--accent-green);
+}
+
+.tip-title {
+    font-weight: 600;
+}
