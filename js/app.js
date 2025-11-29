@@ -151,7 +151,7 @@ function parseCSV(text) {
 
   const obsFilterState = {
     range: 'today',
-    risk: '',
+    area: '',
     status: '',
     search: ''
   };
@@ -181,6 +181,15 @@ function parseCSV(text) {
     if (target) {
       target.classList.add('active');
       target.style.display = 'block';
+    }
+
+    // ensure content area scrolls to top when switching tabs (mobile & desktop)
+    const mainArea = document.querySelector('.content-area');
+    if (mainArea) {
+      mainArea.scrollTop = 0;
+    }
+    if (typeof window !== 'undefined' && window.scrollTo) {
+      window.scrollTo({ top: 0, behavior: 'auto' });
     }
 
     // update active state on bottom nav buttons
@@ -943,6 +952,94 @@ function setupCsmLibrary() {
     });
   }
 }
+// =========================================
+// SAFETY WALKTHROUGH REPORTS LIBRARY
+// =========================================
+//
+// Each item: { title: "Area / Date / Shift", link: "Google Drive or PDF link" }
+//
+// Initialize Safety Walkthrough reports.
+//
+// Each item should represent one documented site walkthrough or safety tour.
+// Titles below follow the pattern:
+// "<Area> - Safety Walkthrough Report on <MM/DD/YYYY>"
+window.walkthroughData = [
+  {
+    title: "Hydro-test Area - Safety Walkthrough Report on 11/10/2025",
+    link: "https://drive.google.com/file/d/1ncnvQj-ycV1HmELH_wPkYIHcLvb8_oyE/view?usp=drive_link"
+  },
+  {
+    title: "GGM Fabrication Area - Safety Walkthrough Report on 11/17/2025",
+    link: "https://drive.google.com/file/d/17HkZkEfUezXFESUXzA2PDnelo8QCowW4/view?usp=drive_link"
+  }
+];
+
+function setupWalkthroughLibrary() {
+  const list = Array.isArray(window.walkthroughData) ? window.walkthroughData : [];
+  const container = $('#walkthroughLibraryList');
+  const search = $('#walkthroughSearch');
+  if (!container) return;
+
+  function render(filter) {
+    const q = (filter || '').toLowerCase();
+    const filtered = list.filter(item =>
+      !q || (item.title && item.title.toLowerCase().includes(q))
+    );
+
+    if (!filtered.length) {
+      container.innerHTML = '<p class="text-muted">No Safety Walkthrough reports configured. Add items in js/app.js under window.walkthroughData.</p>';
+      return;
+    }
+
+    container.innerHTML = filtered
+      .map(item => `
+        <div class="library-item-card">
+          <div class="library-item-header">
+            <div class="library-item-title">
+              <i class="fa-solid fa-person-walking"></i>
+              <span>${item.title}</span>
+            </div>
+            <i class="fas fa-chevron-down library-item-toggle"></i>
+          </div>
+          <div class="library-item-body">
+            <a href="${item.link}" target="_blank" class="library-item-open-button">
+              <i class="fas fa-external-link-alt"></i>
+              Open "${item.title}"
+            </a>
+          </div>
+        </div>
+      `)
+      .join('');
+
+    const cards = Array.from(container.querySelectorAll('.library-item-card'));
+
+    cards.forEach(card => {
+      const headerEl = card.querySelector('.library-item-header');
+      const bodyEl = card.querySelector('.library-item-body');
+      const toggleIcon = card.querySelector('.library-item-toggle');
+      let isOpen = false;
+
+      if (bodyEl) bodyEl.style.display = 'none';
+
+      if (headerEl) {
+        headerEl.addEventListener('click', () => {
+          isOpen = !isOpen;
+          if (bodyEl) bodyEl.style.display = isOpen ? 'block' : 'none';
+          if (toggleIcon) toggleIcon.classList.toggle('rotated', isOpen);
+        });
+      }
+    });
+  }
+
+  render('');
+
+  if (search) {
+    search.addEventListener('input', () => {
+      render(search.value);
+    });
+  }
+}
+
 
   // Switch between "menu" / JSA view / TBT view
 function setupLibrarySwitcher() {
@@ -953,9 +1050,11 @@ function setupLibrarySwitcher() {
   const jsaSearchWrapper = $('#libraryJsaSearchWrapper');
   const tbtSearchWrapper = $('#libraryTbtSearchWrapper');
   const csmSearchWrapper = $('#libraryCsmSearchWrapper');
+  const walkthroughSearchWrapper = $('#libraryWalkthroughSearchWrapper');
   const tbtList = $('#tbtLibraryList');
   const jsaList = $('#jsaListContainer');
   const csmList = $('#csmLibraryList');
+  const walkthroughList = $('#walkthroughLibraryList');
 
   if (!chooser || !content || !backBtn || !titleEl || !tbtList || !jsaList) return;
 
@@ -965,8 +1064,13 @@ function setupLibrarySwitcher() {
 
     if (jsaSearchWrapper) jsaSearchWrapper.style.display = 'none';
     if (tbtSearchWrapper) tbtSearchWrapper.style.display = 'none';
+    if (csmSearchWrapper) csmSearchWrapper.style.display = 'none';
+    if (walkthroughSearchWrapper) walkthroughSearchWrapper.style.display = 'none';
+
     jsaList.style.display = 'none';
     tbtList.style.display = 'none';
+    if (csmList) csmList.style.display = 'none';
+    if (walkthroughList) walkthroughList.style.display = 'none';
   }
 
   function openLibrary(type) {
@@ -977,24 +1081,46 @@ function setupLibrarySwitcher() {
       titleEl.textContent = 'Job Safety Analysis Library';
       if (jsaSearchWrapper) jsaSearchWrapper.style.display = 'block';
       if (tbtSearchWrapper) tbtSearchWrapper.style.display = 'none';
+      if (csmSearchWrapper) csmSearchWrapper.style.display = 'none';
+      if (walkthroughSearchWrapper) walkthroughSearchWrapper.style.display = 'none';
+
       jsaList.style.display = 'block';
       tbtList.style.display = 'none';
+      if (csmList) csmList.style.display = 'none';
+      if (walkthroughList) walkthroughList.style.display = 'none';
     } else if (type === 'tbt') {
       titleEl.textContent = 'Tool Box Talk Library';
       if (jsaSearchWrapper) jsaSearchWrapper.style.display = 'none';
       if (tbtSearchWrapper) tbtSearchWrapper.style.display = 'block';
       if (csmSearchWrapper) csmSearchWrapper.style.display = 'none';
+      if (walkthroughSearchWrapper) walkthroughSearchWrapper.style.display = 'none';
+
       jsaList.style.display = 'none';
       tbtList.style.display = 'block';
       if (csmList) csmList.style.display = 'none';
+      if (walkthroughList) walkthroughList.style.display = 'none';
     } else if (type === 'csm') {
       titleEl.textContent = 'Construction Safety Manual (CSM)';
       if (jsaSearchWrapper) jsaSearchWrapper.style.display = 'none';
       if (tbtSearchWrapper) tbtSearchWrapper.style.display = 'none';
       if (csmSearchWrapper) csmSearchWrapper.style.display = 'block';
+      if (walkthroughSearchWrapper) walkthroughSearchWrapper.style.display = 'none';
+
       jsaList.style.display = 'none';
       tbtList.style.display = 'none';
       if (csmList) csmList.style.display = 'block';
+      if (walkthroughList) walkthroughList.style.display = 'none';
+    } else if (type === 'walkthrough') {
+      titleEl.textContent = 'Safety Walkthrough Reports';
+      if (jsaSearchWrapper) jsaSearchWrapper.style.display = 'none';
+      if (tbtSearchWrapper) tbtSearchWrapper.style.display = 'none';
+      if (csmSearchWrapper) csmSearchWrapper.style.display = 'none';
+      if (walkthroughSearchWrapper) walkthroughSearchWrapper.style.display = 'block';
+
+      jsaList.style.display = 'none';
+      tbtList.style.display = 'none';
+      if (csmList) csmList.style.display = 'none';
+      if (walkthroughList) walkthroughList.style.display = 'block';
     }
 
     // scroll to top of content
@@ -1013,7 +1139,9 @@ function setupLibrarySwitcher() {
   // Default state
   showChooser();
 }
-  
+
+
+// -------------------- Tools (KPI / Heat / Wind) --------------------
 // -------------------- Tools (KPI / Heat / Wind) --------------------
 
   // Heat index formula: convert C to F, apply NOAA formula, back to C
@@ -1041,10 +1169,25 @@ function setupLibrarySwitcher() {
     if (heatIndexC == null || isNaN(heatIndexC)) {
       return { label: '--', level: 'unknown' };
     }
-    if (heatIndexC < 29) return { label: 'Safe', level: 'safe' };
-    if (heatIndexC < 32) return { label: 'Caution', level: 'caution' };
-    if (heatIndexC < 38) return { label: 'Extreme Caution', level: 'warning' };
-    if (heatIndexC < 51) return { label: 'Danger', level: 'danger' };
+
+    // Based on Saudi Aramco CSM I-13 / Safety Handbook Heat Index categories (°C)
+    // Category I  : 25–29  → Caution
+    // Category II : 30–38  → Extreme Caution
+    // Category III: 39–51  → Danger
+    // Category IV : 52+    → Extreme Danger
+    if (heatIndexC < 25) {
+      // Below Category I – still monitor, but no specific table band
+      return { label: 'Safe', level: 'safe' };
+    }
+    if (heatIndexC < 30) {
+      return { label: 'Caution', level: 'caution' };
+    }
+    if (heatIndexC < 39) {
+      return { label: 'Extreme Caution', level: 'warning' };
+    }
+    if (heatIndexC < 52) {
+      return { label: 'Danger', level: 'danger' };
+    }
     return { label: 'Extreme Danger', level: 'extreme' };
   }
 
@@ -1089,20 +1232,20 @@ function setupLibrarySwitcher() {
     const score = l * s;
     let level = 'Low';
     let code = 'RA1';
-    let guidance = 'RA1: Acceptable risk with standard controls. Maintain routine monitoring.';
+    let guidance = 'RA1: Acceptable risk with existing controls. Maintain routine monitoring and good housekeeping. This helper does not replace the formal Saudi Aramco RA/JSA.';
 
     if (score >= 5 && score <= 9) {
       level = 'Medium';
       code = 'RA2';
-      guidance = 'RA2: Improve controls where possible and monitor conditions.';
+      guidance = 'RA2: Reduce risk by improving controls (engineering/administrative/PPE) and monitor conditions. Obtain at least line supervisor approval before starting.';
     } else if (score >= 10 && score <= 16) {
       level = 'High';
       code = 'RA3';
-      guidance = 'RA3: Work only with controls in place and supervisor authorization.';
+      guidance = 'RA3: High risk. Do not start work until additional controls are implemented and verified. Require documented RA/JSA and supervisor/area authority authorization. Stop work if any critical control is missing or conditions change.';
     } else if (score >= 17) {
       level = 'Critical';
       code = 'RA4';
-      guidance = 'RA4: Stop work. Senior management approval and strong controls required.';
+      guidance = 'RA4: Critical risk. Stop work / do not approve. Re-design the task or method and consult proponent/HSE. Only proceed if the risk is formally accepted through the Saudi Aramco RA process with higher-level management approval.';
     }
 
     return { score, level, code, guidance };
@@ -1110,11 +1253,30 @@ function setupLibrarySwitcher() {
 
 
   function classifyWindRisk(speed) {
-    if (speed == null || isNaN(speed)) return { label: '--', level: 'unknown' };
-    // Saudi Aramco CSM I-11: Manbaskets limit is 32 km/h
-    if (speed < 20) return { label: 'Safe for normal work', level: 'safe' };
-    if (speed < 32) return { label: 'Caution – Approaching man-basket limit', level: 'caution' };
-    return { label: 'STOP Man-basket Operations (>32km/h)', level: 'danger' };
+    if (speed == null || isNaN(speed)) {
+      return { label: '--', level: 'unknown' };
+    }
+
+    // Saudi Aramco Safety Handbook / CSM:
+    // - Do not perform crane-suspended personnel platform operations > 25 km/h.
+    // - Do not perform crane lifts at wind speeds above 32 km/h.
+    //   (Always follow the most restrictive manufacturer limit.)
+    if (speed < 20) {
+      return { label: 'Safe for normal work', level: 'safe' };
+    }
+
+    if (speed < 25) {
+      return {
+        label: 'Caution – increasing wind, monitor lifts',
+        level: 'caution'
+      };
+    }
+
+    // ≥ 25 km/h – above manbasket limit; crane lifts must also stop once ≥ 32 km/h
+    return {
+      label: 'STOP manbasket ≥25 km/h; crane lifts ≥32 km/h',
+      level: 'danger'
+    };
   }
 
   function formatWindDirection(deg) {
@@ -1398,7 +1560,7 @@ function calculateHeatIndex() {
         symptoms: 'Fatigue possible with prolonged exposure and/or physical activity.',
         workRest: 'Normal/Scheduled.',
         water: '1 cup (250ml) every 20 minutes.',
-        controls: 'Visual monitorings workers in in direct sun and heavy work.'
+        controls: 'Visual monitoring of workers in direct sun and during heavy work.'
       };
       break;
 
@@ -1408,7 +1570,7 @@ function calculateHeatIndex() {
       tagBg = 'rgba(15,23,42,0.4)';
       tagColor = '#ffffff';
       details = {
-        symptoms: 'Heat cramps, heat, exhaustion, or heat stroke likely with prolonged exposure and physical activity',
+        symptoms: 'Heat cramps, heat exhaustion, or heat stroke possible with prolonged exposure and physical activity',
         workRest: '50:10.',
         water: '1 cup (250ml) every 20 minutes.',
         controls: 'No working alone (buddy system).'
@@ -1421,10 +1583,10 @@ function calculateHeatIndex() {
       tagBg = 'rgba(15,23,42,0.45)';
       tagColor = '#ffffff';
       details = {
-        symptoms: 'Heat cramps, heat, exhaustion, or heat stroke likely with prolonged exposure and physical activity',
+        symptoms: 'Heat cramps, heat exhaustion, or heat stroke likely with prolonged exposure and physical activity',
         workRest: '30:10',
         water: '1 cup (250ml) every 15 minutes.',
-        controls: 'Work unnder shade.'
+        controls: 'Work under shade.'
       };
       break;
 
@@ -1770,21 +1932,6 @@ async function loadPermits() {
     buildPermitsFilterOptions();
     renderPermitsList();
     updateToolsSnapshot();
-
-    if (totalEl) totalEl.textContent = permits.length || '--';
-    if (todayEl) {
-      const today = startOfDay(new Date());
-      const todayCount = permits.filter(p => p.date && isSameDay(p.date, today)).length;
-      todayEl.textContent = todayCount || '0';
-    }
-
-    const receiversEl = $('#permitsCountReceivers');
-    if (receiversEl) {
-      const receivers = Array.from(new Set(
-        permits.map(p => (p.receiver || '').trim()).filter(Boolean)
-      ));
-      receiversEl.textContent = receivers.length || '0';
-    }
   } catch (err) {
     console.error('Failed to load permits', err);
     if (list) {
@@ -1843,6 +1990,35 @@ function getPermitTypeLabel(type) {
   return type;
 }
 
+
+function updatePermitsSummary(baseList, rangeList) {
+  const allPermits = state.permits || [];
+  const base = Array.isArray(baseList) ? baseList : allPermits;
+  const range = Array.isArray(rangeList) ? rangeList : base;
+
+  const rangeKey = permitsFilterState.range || 'today';
+  let labelText = 'All';
+  if (rangeKey === 'today') labelText = 'Today';
+  else if (rangeKey === 'week') labelText = 'This Week';
+  else if (rangeKey === 'month') labelText = 'This Month';
+
+  const totalPermits = base.length;
+  const receivers = Array.from(new Set(
+    base.map(p => (p.receiver || '').trim()).filter(Boolean)
+  ));
+
+  const totalEl = $('#permitsCountTotal');
+  const receiversEl = $('#permitsCountReceivers');
+  const rangeLabelEl = $('#permitsSummaryLabel');
+  const rangeCountEl = $('#permitsCountToday');
+
+  if (totalEl) totalEl.textContent = totalPermits ? String(totalPermits) : '0';
+  if (receiversEl) receiversEl.textContent = receivers.length ? String(receivers.length) : '0';
+  if (rangeLabelEl) rangeLabelEl.textContent = labelText;
+  if (rangeCountEl) rangeCountEl.textContent = range.length ? String(range.length) : '0';
+}
+
+
 function renderPermitsList() {
   const list = $('#permitsList');
   const emptyState = $('#permitsEmptyState');
@@ -1854,24 +2030,16 @@ function renderPermitsList() {
   if (!permits.length) {
     list.innerHTML = '';
     if (emptyState) emptyState.style.display = 'block';
+    updatePermitsSummary([], []);
     return;
   }
-
-  if (emptyState) emptyState.style.display = 'none';
 
   const { range, area, type, search } = permitsFilterState;
   const searchTerm = (search || '').toLowerCase();
   const today = startOfDay(new Date());
 
-  const filtered = permits.filter(p => {
-    // Date range filter
-    if (range && range !== 'all') {
-      if (!p.date) return false;
-      if (range === 'today' && !isSameDay(p.date, today)) return false;
-      if (range === 'week' && Math.abs(daysBetween(p.date, today)) > 7) return false;
-      if (range === 'month' && !isSameMonth(p.date, today)) return false;
-    }
-
+  // First apply non-date filters (area, type, search)
+  let baseFiltered = permits.filter(p => {
     if (area && (!p.area || p.area !== area)) return false;
     if (type && (!p.type || p.type !== type)) return false;
 
@@ -1890,12 +2058,26 @@ function renderPermitsList() {
     return true;
   });
 
-  if (!filtered.length) {
+  // Then apply the date-range filter for the list / range card
+  let rangeFiltered = baseFiltered.filter(p => {
+    if (!range || range === 'all') return true;
+    if (!p.date) return false;
+    if (range === 'today') return isSameDay(p.date, today);
+    if (range === 'week') return Math.abs(daysBetween(p.date, today)) <= 7;
+    if (range === 'month') return isSameMonth(p.date, today);
+    return true;
+  });
+
+  if (!rangeFiltered.length) {
     list.innerHTML = '<p class="text-muted">No permits match the current filters.</p>';
+    if (emptyState) emptyState.style.display = 'block';
+    updatePermitsSummary(baseFiltered, []);
     return;
   }
 
-  list.innerHTML = filtered.map(p => {
+  if (emptyState) emptyState.style.display = 'none';
+
+  list.innerHTML = rangeFiltered.map(p => {
     const dateText = p.date
       ? p.date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
       : (p.dateRaw || '');
@@ -1904,7 +2086,7 @@ function renderPermitsList() {
     const hasEvidence = Array.isArray(p.evidence) && p.evidence.length;
 
     const evidenceIcon = hasEvidence
-      ? '<span class="obs-evidence-chip" title="Work evidence attached" aria-label="Work evidence attached"><i class="fas fa-image"></i></span>'
+      ? '<span class="obs-evidence-chip" title="Work evidence attached"><i class="fas fa-image"></i></span>'
       : '';
 
     return `
@@ -1942,6 +2124,8 @@ function renderPermitsList() {
       if (permit) showPermitDetail(permit);
     });
   });
+
+  updatePermitsSummary(baseFiltered, rangeFiltered);
 }
 
 function setupPermitsFilters() {
@@ -2105,26 +2289,37 @@ function showToolboxDetail(talk) {
     `;
   };
 
-  // Evidence: if evidence looks like a URL, make it clickable
+  
+  // Evidence: support multiple evidence links (Evidence 1, Evidence 2...) same as observations/permits
   const evidenceRaw = (talk.evidence || '').trim();
   let evidenceSection = '';
   if (evidenceRaw) {
-    const isUrl = /^https?:\/\//i.test(evidenceRaw);
-    const content = isUrl
-      ? `<a href="${escapeHtml(evidenceRaw)}" target="_blank" rel="noopener">Open evidence photo</a>`
-      : escapeHtml(evidenceRaw);
+    const parts = evidenceRaw
+      .split(/[;,\n]+/)
+      .map(v => (v || '').trim())
+      .filter(Boolean);
 
-    evidenceSection = `
+    const links = parts.filter(v => /^https?:\/\//i.test(v));
+    const inline = links
+      .map((url, i) => `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">Evidence ${i + 1}</a>`)
+      .join(' • ');
+
+    if (inline) {
+      evidenceSection = `
       <section class="obs-detail-section">
-        <div class="obs-detail-section-title">Evidence</div>
+        <div class="obs-detail-section-title">Toolbox Talk Evidence</div>
         <div class="obs-detail-description-box">
-          ${content}
+          ${inline}
         </div>
+        <p class="obs-detail-hint">
+          Evidence is stored in Google Drive. Open the links to view toolbox talk photos and attendance records.
+        </p>
       </section>
     `;
+    }
   }
 
-  body.innerHTML = `
+body.innerHTML = `
     <section class="obs-detail-section">
       <div class="obs-detail-section-title">Overview</div>
       <div class="obs-detail-grid">
@@ -2280,7 +2475,10 @@ async function loadObservations() {
     state.observations = observations;
     state.observationsLoaded = true;
 
+    populateObservationsAreaFilter(observations);
+
     updateHomeFromObservations();
+    updateHomeObservationInsights();
     updateToolsSnapshot();
     setupObservationsFilters();
     renderObservationsList();
@@ -2292,6 +2490,35 @@ async function loadObservations() {
   }
 }
 
+
+function populateObservationsAreaFilter(list) {
+  const select = $('#obsFilterArea');
+  if (!select || !Array.isArray(list)) return;
+
+  const current = select.value || '';
+  const areas = Array.from(
+    new Set(
+      list
+        .map(o => (o.area || '').trim())
+        .filter(v => v && v.length > 0)
+    )
+  ).sort((a, b) => a.localeCompare(b));
+
+  // Build options: All Areas + unique areas
+  let optionsHtml = '<option value="">All Areas</option>';
+  optionsHtml += areas
+    .map(a => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`)
+    .join('');
+
+  select.innerHTML = optionsHtml;
+
+  // Try to preserve previous selection if still valid
+  if (current && areas.includes(current)) {
+    select.value = current;
+  } else {
+    select.value = '';
+  }
+}
 function updateHomeFromObservations() {
   const obs = state.observations || [];
   const permits = state.permits || [];
@@ -2310,6 +2537,73 @@ function updateHomeFromObservations() {
   if (permitsTodayEl) permitsTodayEl.textContent = todayPermits.length || '--';
 }
 
+
+
+
+function updateHomeObservationInsights() {
+  const listAreas = $('#homeTopAreasList');
+  const listDirect = $('#homeTopDirectCausesList');
+
+  if (!listAreas && !listDirect) return;
+
+  const all = state.observations || [];
+  if (!all.length) {
+    const msg = '<li>No observations loaded yet.</li>';
+    if (listAreas) listAreas.innerHTML = msg;
+    if (listDirect) listDirect.innerHTML = msg;
+    return;
+  }
+
+  const now = new Date();
+  const thisMonth = all.filter(o => o.date && isSameMonth(o.date, now));
+  const source = thisMonth.length ? thisMonth : all;
+
+  function buildTopList(getKey) {
+    const counts = new Map();
+    for (const o of source) {
+      const raw = (getKey(o) || '').trim();
+      if (!raw) continue;
+      const key = raw;
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    const arr = Array.from(counts.entries());
+    arr.sort((a, b) => b[1] - a[1]);
+    return arr.slice(0, 5);
+  }
+
+  const topAreas = buildTopList(o => o.area);
+  const topDirect = buildTopList(o => o.directCause);
+
+  if (listAreas) {
+    if (!topAreas.length) {
+      listAreas.innerHTML = '<li>No area data available for this month.</li>';
+    } else {
+      listAreas.innerHTML = topAreas
+        .map(([name, count]) => `
+          <li>
+            <span class="home-insight-name">${escapeHtml(name)}</span>
+            <span class="home-insight-count">${count}</span>
+          </li>
+        `)
+        .join('');
+    }
+  }
+
+  if (listDirect) {
+    if (!topDirect.length) {
+      listDirect.innerHTML = '<li>No direct cause data available for this month.</li>';
+    } else {
+      listDirect.innerHTML = topDirect
+        .map(([name, count]) => `
+          <li>
+            <span class="home-insight-name">${escapeHtml(name)}</span>
+            <span class="home-insight-count">${count}</span>
+          </li>
+        `)
+        .join('');
+    }
+  }
+}
 
 
 function updateToolsSnapshot() {
@@ -2351,31 +2645,44 @@ function filterObservationsForRange(list, range) {
   });
 }
 
-function updateObservationsSummary() {
-  const obs = state.observations;
-  const monthObs = filterObservationsForRange(obs, 'month');
+function updateObservationsSummary(filteredList) {
+  // Use the currently rendered/filtered observations list when provided,
+  // otherwise fall back to all observations.
+  const allObs = state.observations || [];
+  const obs = Array.isArray(filteredList) ? filteredList : allObs;
 
-  const openCount = monthObs.filter(o =>
+  const range = obsFilterState.range || 'today';
+  let labelText = 'All';
+  if (range === 'today') labelText = 'Today';
+  else if (range === 'week') labelText = 'This Week';
+  else if (range === 'month') labelText = 'This Month';
+
+  const totalCount = obs.length;
+
+  const openCount = obs.filter(o =>
     (o.status || '').toLowerCase().includes('open') ||
     (o.status || '').toLowerCase().includes('progress')
   ).length;
 
-  const closedCount = monthObs.filter(o =>
+  const closedCount = obs.filter(o =>
     (o.status || '').toLowerCase().includes('close')
   ).length;
 
-  const thisMonthEl = $('#obsCountMonth');
+  const labelEl = $('#obsSummaryLabel');
+  const totalEl = $('#obsCountMonth');
   const openEl = $('#obsCountOpen');
   const closedEl = $('#obsCountClosed');
 
-  if (thisMonthEl) thisMonthEl.textContent = monthObs.length || '0';
+  if (labelEl) labelEl.textContent = labelText;
+  if (totalEl) totalEl.textContent = totalCount || '0';
   if (openEl) openEl.textContent = openCount || '0';
   if (closedEl) closedEl.textContent = closedCount || '0';
 }
 
+
 function setupObservationsFilters() {
   const rangeButtons = $all('#ObservationsTab .obs-filter-chip');
-  const riskSelect = $('#obsFilterRisk');
+  const areaSelect = $('#obsFilterArea');
   const statusSelect = $('#obsFilterStatus');
   const searchInput = $('#obsSearch');
 
@@ -2388,9 +2695,9 @@ function setupObservationsFilters() {
     });
   });
 
-  if (riskSelect) {
-    riskSelect.addEventListener('change', () => {
-      obsFilterState.risk = riskSelect.value || '';
+  if (areaSelect) {
+    areaSelect.addEventListener('change', () => {
+      obsFilterState.area = areaSelect.value || '';
       renderObservationsList();
     });
   }
@@ -2416,6 +2723,7 @@ function setupObservationsFilters() {
   }
 }
 
+
 function renderObservationsList() {
   const listEl = $('#observationsList');
   const emptyState = $('#observationsEmptyState');
@@ -2434,7 +2742,7 @@ function renderObservationsList() {
       </div>
     `;
     if (emptyState) emptyState.style.display = 'block';
-    updateObservationsSummary();
+    updateObservationsSummary([]);
     return;
   }
 
@@ -2443,9 +2751,9 @@ function renderObservationsList() {
   // Apply filters
   obs = filterObservationsForRange(obs, obsFilterState.range);
 
-  if (obsFilterState.risk) {
-    const r = obsFilterState.risk.toLowerCase();
-    obs = obs.filter(o => (o.raLevel || '').toLowerCase().includes(r));
+  if (obsFilterState.area) {
+    const a = obsFilterState.area.toLowerCase();
+    obs = obs.filter(o => (o.area || '').toLowerCase() === a);
   }
   if (obsFilterState.status) {
     const s = obsFilterState.status.toLowerCase();
@@ -2471,7 +2779,7 @@ function renderObservationsList() {
         <p>No observations match the selected filters.</p>
       </div>
     `;
-    updateObservationsSummary();
+    updateObservationsSummary([]);
     return;
   }
 
@@ -2535,7 +2843,7 @@ function renderObservationsList() {
   }).join('');
 
   listEl.innerHTML = cardsHtml;
-  updateObservationsSummary();
+  updateObservationsSummary(obs);
 
   // Click handler → open detail modal
   const cards = Array.from(listEl.querySelectorAll('.obs-card'));
@@ -2707,26 +3015,37 @@ function showToolboxDetail(talk) {
     `;
   };
 
-  // Evidence: if evidence looks like a URL, make it clickable
+  
+  // Evidence: support multiple evidence links (Evidence 1, Evidence 2...) same as observations/permits
   const evidenceRaw = (talk.evidence || '').trim();
   let evidenceSection = '';
   if (evidenceRaw) {
-    const isUrl = /^https?:\/\//i.test(evidenceRaw);
-    const content = isUrl
-      ? `<a href="${escapeHtml(evidenceRaw)}" target="_blank" rel="noopener">Open evidence photo</a>`
-      : escapeHtml(evidenceRaw);
+    const parts = evidenceRaw
+      .split(/[;,\n]+/)
+      .map(v => (v || '').trim())
+      .filter(Boolean);
 
-    evidenceSection = `
+    const links = parts.filter(v => /^https?:\/\//i.test(v));
+    const inline = links
+      .map((url, i) => `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">Evidence ${i + 1}</a>`)
+      .join(' • ');
+
+    if (inline) {
+      evidenceSection = `
       <section class="obs-detail-section">
-        <div class="obs-detail-section-title">Evidence</div>
+        <div class="obs-detail-section-title">Toolbox Talk Evidence</div>
         <div class="obs-detail-description-box">
-          ${content}
+          ${inline}
         </div>
+        <p class="obs-detail-hint">
+          Evidence is stored in Google Drive. Open the links to view toolbox talk photos and attendance records.
+        </p>
       </section>
     `;
+    }
   }
 
-  body.innerHTML = `
+body.innerHTML = `
     <section class="obs-detail-section">
       <div class="obs-detail-section-title">Overview</div>
       <div class="obs-detail-grid">
@@ -2901,6 +3220,25 @@ const toolboxFilterState = {
   search: ''
 };
 
+
+function updateToolboxSummary(filteredList) {
+  const talks = Array.isArray(filteredList) ? filteredList : (state.toolboxTalks || []);
+
+  const totalTalks = talks.length;
+  const areas = Array.from(new Set(
+    talks.map(t => (t.area || '').trim()).filter(Boolean)
+  ));
+  const totalAttendance = talks.reduce((sum, t) => sum + (t.attendance || 0), 0);
+
+  const totalEl = $('#tbtCountTotal');
+  const areasEl = $('#tbtCountAreas');
+  const attendanceEl = $('#tbtCountAttendance');
+
+  if (totalEl) totalEl.textContent = String(totalTalks || 0);
+  if (areasEl) areasEl.textContent = String(areas.length || 0);
+  if (attendanceEl) attendanceEl.textContent = String(totalAttendance || 0);
+}
+
 async function loadToolboxTalks() {
   const url = window.TBT_SHEET_CSV_URL ||
     'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ5EYzYhv5Br98EGb_rMGGOKvtb3lRX-5R0s-DBcTdwFgEPtWwV2YTBKxpuZl0yqvf2vnyQilL5SvuL/pub?output=csv';
@@ -2964,18 +3302,9 @@ async function loadToolboxTalks() {
 
     state.toolboxTalks = talks;
 
-    const totalTalks = talks.length;
-    const today = startOfDay(new Date());
-    const todayTalks = talks.filter(t => t.date && isSameDay(t.date, today));
-    const areas = Array.from(new Set(talks.map(t => (t.area || '').trim()).filter(Boolean)));
-    const totalAttendance = talks.reduce((sum, t) => sum + (t.attendance || 0), 0);
-
-    if (totalEl) totalEl.textContent = String(totalTalks);
-    if (areasEl) areasEl.textContent = String(areas.length || 0);
-    if (attendanceEl) attendanceEl.textContent = String(totalAttendance);
-
     buildToolboxFilterOptions();
     renderToolboxList();
+    updateToolboxSummary(state.toolboxTalks);
   } catch (err) {
     console.error('Toolbox load error:', err);
     list.innerHTML = '<p class="text-muted">Failed to load toolbox talks.</p>';
@@ -3011,6 +3340,7 @@ function renderToolboxList() {
   if (!talks.length) {
     list.innerHTML = '<p class="text-muted">No toolbox talks loaded yet.</p>';
     if (emptyState) emptyState.style.display = 'block';
+    updateToolboxSummary([]);
     return;
   }
 
@@ -3050,10 +3380,12 @@ function renderToolboxList() {
   if (!filtered.length) {
     list.innerHTML = '<p class="text-muted">No toolbox talks match the current filters.</p>';
     if (emptyState) emptyState.style.display = 'block';
+    updateToolboxSummary([]);
     return;
   }
 
   if (emptyState) emptyState.style.display = 'none';
+  updateToolboxSummary(filtered);
 
   list.innerHTML = filtered.map(t => {
     const dateText = t.date
@@ -3264,6 +3596,7 @@ function initApp() {
   setupTbtLibrary();
   setupJsaLibrary();
   setupCsmLibrary();
+  setupWalkthroughLibrary();
   setupLibrarySwitcher();
   setupTools();
   setupRiskMatrix();
