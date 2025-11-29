@@ -433,99 +433,6 @@ body.dark-mode #emergencyQuickButton {
     margin-bottom: 1rem;
 }
 
-
-.home-insights-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-    margin-top: 0.25rem;
-}
-
-.home-insights-column h4 {
-    font-size: 0.85rem;
-    margin-bottom: 0.3rem;
-    color: var(--text-soft, #6b7280);
-}
-
-.home-insights-list {
-    list-style: none;
-    padding-left: 0;
-    margin: 0;
-    font-size: 0.85rem;
-}
-
-.home-insights-list li {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.15rem 0;
-    border-bottom: 1px dashed rgba(148, 163, 184, 0.45);
-}
-
-.home-insights-list li:last-child {
-    border-bottom: none;
-}
-
-.home-insight-name {
-    max-width: 75%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.home-insight-count {
-    font-weight: 600;
-}
-
-@media (min-width: 768px) {
-    .home-insights-grid {
-        flex-direction: row;
-    }
-}
-
-/* Lifesaving rules checklist */
-.lifesaving-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
-    margin-top: 0.75rem;
-}
-
-.lifesaving-item {
-    flex: 1 1 45%;
-}
-
-.lifesaving-label {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.4rem;
-    font-size: 0.86rem;
-    font-weight: 600;
-}
-
-.lifesaving-checkbox {
-    margin-top: 0.18rem;
-}
-
-.lifesaving-note {
-    margin: 0.15rem 0 0.35rem;
-    font-size: 0.8rem;
-    color: var(--text-soft, #6b7280);
-}
-
-.lifesaving-footnote {
-    margin-top: 0.5rem;
-    font-size: 0.78rem;
-    color: var(--text-soft, #6b7280);
-}
-
-@media (min-width: 768px) {
-    .lifesaving-grid {
-        flex-direction: row;
-        flex-wrap: wrap;
-    }
-}
-
 .home-kpi-card {
     background: linear-gradient(135deg, #15803d, #22c55e);
     color: #ecfdf5;
@@ -2548,4 +2455,98 @@ body.dark-mode .news-back-btn {
 .news-panel-body .announcement-card {
     padding-top: 1rem;
     padding-bottom: 1rem;
+}
+
+
+/* Home insights: Top 5 areas & direct causes */
+.home-insights-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 0.25rem;
+}
+
+.home-insights-column h4 {
+    font-size: 0.85rem;
+    margin-bottom: 0.3rem;
+    color: var(--text-soft, #6b7280);
+}
+
+.home-insights-list {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+    font-size: 0.85rem;
+}
+
+.home-insights-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.15rem 0;
+    border-bottom: 1px dashed rgba(148, 163, 184, 0.45);
+}
+
+.home-insights-list li:last-child {
+    border-bottom: none;
+}
+
+.home-insight-name {
+    max-width: 75%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.home-insight-count {
+    font-weight: 600;
+}
+
+@media (min-width: 768px) {
+    .home-insights-grid {
+        flex-direction: row;
+    }
+}
+
+/* Lifesaving rules checklist */
+.lifesaving-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin-top: 0.75rem;
+}
+
+.lifesaving-item {
+    flex: 1 1 45%;
+}
+
+.lifesaving-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.4rem;
+    font-size: 0.86rem;
+    font-weight: 600;
+}
+
+.lifesaving-checkbox {
+    margin-top: 0.18rem;
+}
+
+.lifesaving-note {
+    margin: 0.15rem 0 0.35rem;
+    font-size: 0.8rem;
+    color: var(--text-soft, #6b7280);
+}
+
+.lifesaving-footnote {
+    margin-top: 0.5rem;
+    font-size: 0.78rem;
+    color: var(--text-soft, #6b7280);
+}
+
+@media (min-width: 768px) {
+    .lifesaving-grid {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
 }
