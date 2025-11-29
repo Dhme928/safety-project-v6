@@ -163,8 +163,28 @@
                 <span id="colorName">...</span>
             </p>
 
+            <section class="home-card" id="homeObservationsInsights">
+                <header class="home-card-header">
+                    <h3><i class="fas fa-chart-pie"></i> This Month – Top 5 Areas &amp; Direct Causes</h3>
+                </header>
+                <div class="home-insights-grid">
+                    <div class="home-insights-column">
+                        <h4>Top 5 Areas (by observations)</h4>
+                        <ol id="homeTopAreasList" class="home-insights-list">
+                            <li>No data loaded yet.</li>
+                        </ol>
+                    </div>
+                    <div class="home-insights-column">
+                        <h4>Top 5 Direct Causes</h4>
+                        <ol id="homeTopDirectCausesList" class="home-insights-list">
+                            <li>No data loaded yet.</li>
+                        </ol>
+                    </div>
+                </div>
+            </section>
 
-            
+
+   
 
 
             <section class="home-card highlight-card">
@@ -315,7 +335,7 @@
         <section id="ObservationsTab" class="tab-content">
             <div class="obs-summary-bar">
                 <div class="obs-summary-item">
-                    <div class="obs-summary-label">This Month</div>
+                    <div class="obs-summary-label" id="obsSummaryLabel">This Month</div>
                     <div class="obs-summary-value" id="obsCountMonth">--</div>
                 </div>
                 <div class="obs-summary-item">
@@ -336,11 +356,8 @@
                     <button class="obs-filter-chip" data-range="all">All</button>
                 </div>
                 <div class="obs-filter-row">
-                    <select id="obsFilterRisk">
-                        <option value="">All Risks</option>
-                        <option value="High">High</option>
-                        <option value="Medium">Medium</option>
-                        <option value="Low">Low</option>
+                    <select id="obsFilterArea">
+                        <option value="">All Areas</option>
                     </select>
                     <select id="obsFilterStatus">
                         <option value="">All Statuses</option>
@@ -391,7 +408,7 @@
                     <div class="obs-summary-value" id="permitsCountReceivers">--</div>
                 </div>
                 <div class="obs-summary-item">
-                    <div class="obs-summary-label">Today</div>
+                    <div class="obs-summary-label" id="permitsSummaryLabel">Today</div>
                     <div class="obs-summary-value" id="permitsCountToday">--</div>
                 </div>
             </div>
@@ -538,6 +555,12 @@
   <h3>Saudi Aramco Safety Handbook</h3>
   <p>Open the latest handbook in a new tab.</p>
 </div>
+<div class="library-choice-card library-card" data-library="walkthrough">
+  <i class="fa-solid fa-person-walking" style="color: #0ea5e9;"></i>
+  <h3>Safety Walkthrough Reports</h3>
+  <p>Browse site safety walkthrough and inspection reports.</p>
+</div>
+</div>
 
             </div>
 
@@ -576,7 +599,17 @@
 <div id="libraryCsmSearchWrapper" class="library-search" style="display: none;">
   <input type="text" id="csmSearch" placeholder="Search CSM titles (e.g., lifting, excavation, PPE)..." />
 </div>
+
+<!-- Safety Walkthrough search bar -->
+<div id="libraryWalkthroughSearchWrapper" class="library-search" style="display: none;">
+  <input type="text" id="walkthroughSearch" placeholder="Search Safety Walkthrough Reports (e.g., yard, area, date)..." />
+</div>
+
 <div id="tbtLibraryList" class="library-list" style="display: none;"></div>
+
+<!-- Safety Walkthrough list -->
+<div id="walkthroughLibraryList" class="library-list" style="display: none;"></div>
+
 <!-- CSM list -->
 <div id="csmLibraryList" class="library-list" style="display: none;"></div>
 
@@ -725,8 +758,85 @@
                         <li>Enter wind speed to see limits.</li>
                     </ul>
                 </div>
+
             </section>
-        </section>
+
+            <!-- LIFESAVING RULES CHECKLIST -->
+            <section id="lifesavingRulesCard" class="home-card tools-card">
+                <div class="tools-section-header">
+                    <i class="fas fa-heartbeat"></i>
+                    <div>
+                        <h3>Lifesaving Rules Quick Checklist</h3>
+                        <small>Use before starting high‑risk work – confirm critical controls are in place.</small>
+                    </div>
+                </div>
+
+                <div class="lifesaving-grid">
+                    <div class="lifesaving-item">
+                        <label class="lifesaving-label">
+                            <input type="checkbox" class="lifesaving-checkbox" />
+                            Valid work permit in place
+                        </label>
+                        <p class="lifesaving-note">
+                            Permit scope, SIMOPS, isolations and duration verified with permit issuer/receiver.
+                        </p>
+                    </div>
+
+                    <div class="lifesaving-item">
+                        <label class="lifesaving-label">
+                            <input type="checkbox" class="lifesaving-checkbox" />
+                            Energy isolation / LOTO applied
+                        </label>
+                        <p class="lifesaving-note">
+                            All hazardous energy sources identified, isolated, locked and tested before work.
+                        </p>
+                    </div>
+
+                    <div class="lifesaving-item">
+                        <label class="lifesaving-label">
+                            <input type="checkbox" class="lifesaving-checkbox" />
+                            Working at height protected
+                        </label>
+                        <p class="lifesaving-note">
+                            Approved access, guardrails or full body harness with lifeline; tools secured against drops.
+                        </p>
+                    </div>
+
+                    <div class="lifesaving-item">
+                        <label class="lifesaving-label">
+                            <input type="checkbox" class="lifesaving-checkbox" />
+                            Lifting &amp; rigging controls in place
+                        </label>
+                        <p class="lifesaving-note">
+                            Certified lifting plan, competent rigger/signalman, exclusion zone and safe wind limits checked.
+                        </p>
+                    </div>
+
+                    <div class="lifesaving-item">
+                        <label class="lifesaving-label">
+                            <input type="checkbox" class="lifesaving-checkbox" />
+                            Confined space controls in place
+                        </label>
+                        <p class="lifesaving-note">
+                            Entry permit, gas testing, ventilation, attendant and rescue plan confirmed.
+                        </p>
+                    </div>
+
+                    <div class="lifesaving-item">
+                        <label class="lifesaving-label">
+                            <input type="checkbox" class="lifesaving-checkbox" />
+                            Traffic &amp; line‑of‑fire risks controlled
+                        </label>
+                        <p class="lifesaving-note">
+                            Routes separated, spotter in place, no one standing under or between moving loads.
+                        </p>
+                    </div>
+                </div>
+
+                <p class="lifesaving-footnote">
+                    This is a quick reminder only. Always follow the full Saudi Aramco Lifesaving Rules, CSM and Safety Handbook.
+                </p>
+            </section>
 
         <!-- NEWS PANEL (opens from header icon) -->
         <section id="NewsPanel" class="news-panel" aria-hidden="true">
