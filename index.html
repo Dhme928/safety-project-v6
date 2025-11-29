@@ -534,38 +534,83 @@
         <!-- LIBRARY TAB (chooser + content) -->
         <section id="JSATab" class="tab-content">
 
-            <!-- First view: chooser with two big blocks -->
+            <!-- First view: chooser with big library blocks -->
+            <header class="library-intro">
+                <h2>Safety Library</h2>
+                <p>Quick access to JSAs, toolbox talks, manuals and walkthrough reports.</p>
+            </header>
+
             <div id="libraryChooser" class="library-chooser">
                 <div class="library-choice-card library-card" data-library="jsa">
-                    <i class="fa-solid fa-book" style="color: #B197FC;"></i>
-                    <h3>Job Safety Analysis Library</h3>
-                    <p>Browse JSA documents for key activities.</p>
+                    <div class="library-choice-meta">
+                        <span class="library-chip">JSAs</span>
+                    </div>
+                    <div class="library-choice-main">
+                        <i class="fa-solid fa-book"></i>
+                        <div>
+                            <h3>Job Safety Analysis Library</h3>
+                            <p>Browse JSA documents for high-risk and routine activities.</p>
+                        </div>
+                    </div>
                 </div>
-                <div class="library-choice-card library-card" data-library="tbt">
-                    <i class="fas fa-book-open"></i>
-                    <h3>Tool Box Talk Library</h3>
-                    <p>Browse TBTs for daily safety briefings.</p>
-                </div>
-<div class="library-choice-card library-card" data-library="csm">
-<i class="fa-regular fa-helmet-safety" style="color: #63E6BE;"></i>
-  <h3>Construction Safety Manual (CSM)</h3>
-  <p>Browse CSM chapters, guidelines & procedures.</p>
-</div>
-<div class="library-choice-card library-card" onclick="window.open('https://drive.google.com/file/d/109vG3Hk3PdgvQF87k0EJ1IiKDTDfdQTv/view?usp=sharing', '_blank')">
-  <i class="fa-solid fa-book-bookmark" style="color: #22c55e;"></i>
-  <h3>Saudi Aramco Safety Handbook</h3>
-  <p>Open the latest handbook in a new tab.</p>
-</div>
-<div class="library-choice-card library-card" data-library="walkthrough">
-  <i class="fa-solid fa-person-walking" style="color: #0ea5e9;"></i>
-  <h3>Safety Walkthrough Reports</h3>
-  <p>Browse site safety walkthrough and inspection reports.</p>
-</div>
-</div>
 
+                <div class="library-choice-card library-card" data-library="tbt">
+                    <div class="library-choice-meta">
+                        <span class="library-chip">Talks</span>
+                    </div>
+                    <div class="library-choice-main">
+                        <i class="fas fa-book-open"></i>
+                        <div>
+                            <h3>Tool Box Talk Library</h3>
+                            <p>Browse TBTs for daily safety briefings and refreshers.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="library-choice-card library-card" data-library="csm">
+                    <div class="library-choice-meta">
+                        <span class="library-chip">Standard</span>
+                    </div>
+                    <div class="library-choice-main">
+                        <i class="fa-regular fa-helmet-safety"></i>
+                        <div>
+                            <h3>Construction Safety Manual (CSM)</h3>
+                            <p>Browse CSM chapters, guidelines and procedures.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div
+                    class="library-choice-card library-card"
+                    onclick="window.open('https://drive.google.com/file/d/1u9YAc-BggTUomhuF7Hz0-zDZdGFA0Rpt/view', '_blank')">
+                    <div class="library-choice-meta">
+                        <span class="library-chip">Reference</span>
+                    </div>
+                    <div class="library-choice-main">
+                        <i class="fa-solid fa-book-bookmark"></i>
+                        <div>
+                            <h3>Saudi Aramco Safety Handbook</h3>
+                            <p>Open the latest handbook in a new browser tab.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="library-choice-card library-card" data-library="walkthrough">
+                    <div class="library-choice-meta">
+                        <span class="library-chip">Reports</span>
+                    </div>
+                    <div class="library-choice-main">
+                        <i class="fa-solid fa-person-walking"></i>
+                        <div>
+                            <h3>Safety Walkthrough Reports</h3>
+                            <p>Browse area-based safety walkthrough and inspection reports.</p>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <!-- Second view: actual library (JSA or TBT) -->
+
+<!-- Second view: actual library (JSA or TBT) -->
             <div id="libraryContent" class="library-content" style="display: none;">
                 <button id="libraryBackButton" type="button" class="library-back">
                     <i class="fas fa-arrow-left"></i> Back to library menu
@@ -619,6 +664,10 @@
 
         <!-- TOOLS TAB -->
         <section id="ToolsTab" class="tab-content">
+            <header class="tools-intro">
+                <h2>Safety Tools</h2>
+                <p>Use the risk matrix and environment calculators before issuing permits or planning critical work.</p>
+            </header>
             <div class="tool-toggle-container">
                 <button class="tool-toggle-btn active-tool" type="button" data-tool="risk">
                     Risk Matrix
@@ -779,7 +828,7 @@
                             Valid work permit in place
                         </label>
                         <p class="lifesaving-note">
-                            Permit scope, SIMOPS, isolations and duration verified with permit issuer and receiver.
+                            Permit scope, SIMOPS, isolations and duration verified with issuer and receiver.
                         </p>
                     </div>
 
