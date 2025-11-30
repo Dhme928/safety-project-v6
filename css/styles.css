@@ -2742,3 +2742,68 @@ body.dark-mode .news-back-btn {
 .tip-title {
     font-weight: 600;
 }
+
+
+/* Heavy equipment images */
+
+.heavy-equipment-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  object-fit: contain;
+  margin-right: 0.75rem;
+  flex-shrink: 0;
+}
+
+.heavy-equipment-detail-image {
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.heavy-equipment-detail-image img {
+  max-width: 120px;
+  max-height: 120px;
+  border-radius: 12px;
+  object-fit: contain;
+}
+
+
+
+/* Heavy Equipment filters: match Observations layout */
+#HeavyEquipmentTab .obs-filter-row select {
+  flex: 1;
+}
+#HeavyEquipmentTab #heqSearch {
+  width: 100%;
+}
+
+
+
+.heq-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.heq-badge-valid {
+  background: #166534; /* green */
+  color: #ecfdf5;
+}
+
+.heq-badge-due {
+  background: #ea580c; /* orange */
+  color: #fff7ed;
+}
+
+.heq-badge-expired {
+  background: #b91c1c; /* red */
+  color: #fee2e2;
+}
+
+.heq-badge-missing {
+  background: #0f172a;
+  color: #9ca3af;
+}
