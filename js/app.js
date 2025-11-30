@@ -150,7 +150,7 @@ function parseCSV(text) {
   };
 
   const obsFilterState = {
-    range: 'today',
+    range: 'month',
     area: '',
     status: '',
     search: ''
@@ -162,6 +162,13 @@ function parseCSV(text) {
     type: '',
     search: ''
   };
+
+  // Chart instances for Home tab donut charts
+  let homeTopAreasChart = null;
+  let homeTopDirectChart = null;
+
+
+
 
   // -------------------- Tab navigation --------------------
 
@@ -566,6 +573,12 @@ async function loadEomAndLeaderboard() {
         <div class="tbt-title">${todayTbt.title}</div>
         <a href="${todayTbt.link}" class="tbt-link" target="_blank">Open TBT document</a>
       `;
+    }
+
+    // Update Home "Talks Today" KPI: 1 if we have a TBT of the day, otherwise 0
+    const talksTodayEl = $('#homeTalksToday');
+    if (talksTodayEl) {
+      talksTodayEl.textContent = todayTbt ? '1' : '0';
     }
 
     if (tbtPanel) {
@@ -2537,6 +2550,197 @@ function updateHomeFromObservations() {
   if (permitsTodayEl) permitsTodayEl.textContent = todayPermits.length || '--';
 }
 
+
+
+
+function handleHomeDonutClick(dimension, label) {
+  if (!label) return;
+
+  // Switch to Observations tab (this will also lazy-load observations on first open)
+  const obsTabButton = document.querySelector('.nav-button[data-tab="ObservationsTab"]');
+  if (obsTabButton) {
+    obsTabButton.click();
+  }
+
+  // Force range to "this month" to match the Home insights logic
+  if (typeof obsFilterState !== 'undefined') {
+    obsFilterState.range = 'month';
+  }
+  const rangeButtons = document.querySelectorAll('#ObservationsTab .obs-filter-chip');
+  rangeButtons.forEach(btn => {
+    const isMonth = (btn.dataset.range || '') === 'month';
+    btn.classList.toggle('active', isMonth);
+  });
+
+  // Update observation filter state based on dimension
+  if (dimension === 'area') {
+    if (typeof obsFilterState !== 'undefined') {
+      obsFilterState.area = label;
+      // Clear any previous free-text search so area filter is clean
+      obsFilterState.search = '';
+    }
+    const areaSelect = document.getElementById('obsFilterArea');
+    if (areaSelect) {
+      areaSelect.value = label;
+    }
+    const searchInput = document.getElementById('obsSearch');
+    if (searchInput) {
+      searchInput.value = '';
+    }
+  } else if (dimension === 'directCause') {
+    // If there is a dedicated direct cause filter, use it
+    const dcSelect = document.getElementById('obsFilterDirectCause');
+    if (dcSelect) {
+      dcSelect.value = label;
+    } else {
+      // Fallback: use search filter
+      if (typeof obsFilterState !== 'undefined') {
+        obsFilterState.search = label.toLowerCase();
+      }
+      const searchInput = document.getElementById('obsSearch');
+      if (searchInput) {
+        searchInput.value = label;
+      }
+    }
+  }
+
+  // Re-render observations using the new filters
+  if (typeof renderObservationsList === 'function') {
+    renderObservationsList();
+  }
+}
+
+
+function updateHomeTopAreasChart(topAreas) {
+  const canvas = document.getElementById('homeTopAreasChart');
+  if (!canvas || typeof Chart === 'undefined') return;
+
+  // If no data, clear existing chart if present
+  if (!topAreas || !topAreas.length) {
+    if (homeTopAreasChart) {
+      homeTopAreasChart.destroy();
+      homeTopAreasChart = null;
+    }
+    return;
+  }
+
+  const labels = topAreas.map(item => item[0]);
+  const data = topAreas.map(item => item[1]);
+
+  // Recreate chart each update to keep it simple
+  if (homeTopAreasChart) {
+    homeTopAreasChart.destroy();
+  }
+
+  homeTopAreasChart = new Chart(canvas.getContext('2d'), {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Observations',
+        data,
+        // Chart.js will auto-assign colors; we just set general styling
+        borderWidth: 1,
+        hoverOffset: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '55%',
+      plugins: {
+        legend: {
+          display: true,
+          position: 'bottom',
+          labels: {
+            boxWidth: 12,
+            usePointStyle: true
+          }
+        },
+        tooltip: {
+          callbacks: {
+            label(context) {
+              const value = context.parsed;
+              const label = context.label || '';
+              return `${label}: ${value} observations`;
+            }
+          }
+        }
+      },
+      onClick(evt, elements) {
+        if (!elements || !elements.length) return;
+        const index = elements[0].index;
+        const label = labels[index];
+        handleHomeDonutClick('area', label);
+      }
+    }
+  });
+}
+
+
+function updateHomeTopDirectCausesChart(topDirect) {
+  const canvas = document.getElementById('homeTopDirectCausesChart');
+  if (!canvas || typeof Chart === 'undefined') return;
+
+  if (!topDirect || !topDirect.length) {
+    if (homeTopDirectChart) {
+      homeTopDirectChart.destroy();
+      homeTopDirectChart = null;
+    }
+    return;
+  }
+
+  const labels = topDirect.map(item => item[0]);
+  const data = topDirect.map(item => item[1]);
+
+  if (homeTopDirectChart) {
+    homeTopDirectChart.destroy();
+  }
+
+  homeTopDirectChart = new Chart(canvas.getContext('2d'), {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Observations',
+        data,
+        borderWidth: 1,
+        hoverOffset: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '55%',
+      plugins: {
+        legend: {
+          display: true,
+          position: 'bottom',
+          labels: {
+            boxWidth: 12,
+            usePointStyle: true
+          }
+        },
+        tooltip: {
+          callbacks: {
+            label(context) {
+              const value = context.parsed;
+              const label = context.label || '';
+              return `${label}: ${value} observations`;
+            }
+          }
+        }
+      },
+      onClick(evt, elements) {
+        if (!elements || !elements.length) return;
+        const index = elements[0].index;
+        const label = labels[index];
+        handleHomeDonutClick('directCause', label);
+      }
+    }
+  });
+}
+
 function updateHomeObservationInsights() {
   const listAreas = $('#homeTopAreasList');
   const listDirect = $('#homeTopDirectCausesList');
@@ -2584,6 +2788,14 @@ function updateHomeObservationInsights() {
         `)
         .join('');
     }
+  }
+
+  // Update Home tab donut charts
+  try {
+    updateHomeTopAreasChart(topAreas);
+    updateHomeTopDirectCausesChart(topDirect);
+  } catch (e) {
+    console.error('Home chart error', e);
   }
 
   if (listDirect) {
@@ -3106,7 +3318,12 @@ window.hideObservationDetailModal = hideObservationDetailModal;
       if (!rows.length) throw new Error('Empty sheet');
 
       const headers = rows[0];
-      const body = rows.slice(1).filter(r => r.some(c => c && c.trim() !== ''));
+      let body = rows.slice(1).filter(r => r.some(c => c && c.trim() !== ''));
+
+      // Keep only the latest 6 news items (assuming sheet is already sorted by date, latest first)
+      if (body.length > 6) {
+        body = body.slice(0, 6);
+      }
 
       const idxDate = findColumnIndex(headers, ['Date']);
       const idxTitle = findColumnIndex(headers, ['Title', 'Subject']);
@@ -3150,24 +3367,37 @@ window.hideObservationDetailModal = hideObservationDetailModal;
 
       // Attach click handlers (only when there are real details)
       $all('.announcement-card').forEach(card => {
-        const titleEl = card.querySelector('.card-title.clickable');
         const contentEl = card.querySelector('.card-content');
         const icon = card.querySelector('.toggle-icon');
 
-        if (!contentEl || card.classList.contains('no-details')) {
-          // no-details cards just show static text
+        if (!contentEl) {
           return;
         }
 
-        // start collapsed
+        // Cards that truly have no extra details stay open/static
+        if (card.classList.contains('no-details')) {
+          card.classList.add('open');
+          return;
+        }
+
+        // Start collapsed; visual expand/collapse is handled by CSS via the .open class
         card.classList.remove('open');
-        contentEl.style.display = 'none';
 
-        const clickTarget = titleEl || card;
+        // Make the whole card clickable to expand/collapse; close others when one opens
+        card.addEventListener('click', () => {
+          const alreadyOpen = card.classList.contains('open');
 
-        clickTarget.addEventListener('click', () => {
-          const isOpen = card.classList.toggle('open');
-          contentEl.style.display = isOpen ? 'block' : 'none';
+          // Close all other cards
+          $all('.announcement-card.open').forEach(other => {
+            if (other === card) return;
+            other.classList.remove('open');
+            const otherIcon = other.querySelector('.toggle-icon');
+            if (otherIcon) otherIcon.classList.remove('rotated');
+          });
+
+          // Toggle current card
+          const isOpen = !alreadyOpen;
+          card.classList.toggle('open', isOpen);
           if (icon) icon.classList.toggle('rotated', isOpen);
         });
       });
