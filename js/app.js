@@ -76,6 +76,59 @@ function parseCSV(text) {
       .replace(/'/g, '&#39;');
   }
 
+
+  
+  const EQUIPMENT_IMAGE_MAP = {
+    'articulated trucks - pwas needed': 'Articulated Trucks - PWAS Needed.png',
+    'backhoe loaders - pwas needed': 'Backhoe Loaders - PWAS Needed.png',
+    'boom truck - articulating - pwas not needed': 'Boom Truck - Articulating - PWAS Not Needed.png',
+    'boom truck - telescoping - pwas not needed': 'Boom Truck - Telescoping - PWAS Not Needed.png',
+    'cherry pickers - pwas not needed': 'Cherry Pickers - PWAS Not Needed.png',
+    'cold planer attachment - pwas needed': 'Cold Planer Attachment - PWAS Needed.png',
+    'cold planers/milling machines - pwas not needed': 'Cold PlanersMilling Machines - PWAS Not Needed.png',
+    'compactors/rollers - pwas needed': 'CompactorsRollers - PWAS Needed.png',
+    'concrete trucks - pwas needed': 'Concrete Trucks - PWAS Needed.png',
+    'crane - mobile - pwas not needed': 'Crane - Mobile - PWAS Not Needed.png',
+    'crane - pedestal - pwas not needed': 'Crane - Pedestal - PWAS Not Needed.png',
+    'crane - tower - pwas not needed': 'Crane - Tower - PWAS Not Needed.png',
+    'crawler loader - pwas needed': 'Crawler Loader - PWAS Needed.png',
+    'dump trucks - pwas needed': 'Dump Trucks - PWAS Needed.png',
+    'excavator base with attachment - pwas needed': 'Excavator Base With Attachment - PWAS Needed.png',
+    'excavators - pwas needed': 'Excavators - PWAS Needed.png',
+    'forklift - pwas needed': 'Forklift - PWAS Needed.png',
+    'front shovel excavators - pwas needed': 'Front Shovel Excavators - PWAS Needed.png',
+    'gradall - pwas needed': 'Gradall - PWAS Needed.png',
+    'grader - pwas needed': 'Grader - PWAS Needed.png',
+    'loader - skid (bobcat) - pwas needed': 'Loader - Skid (Bobcat) - PWAS Needed.png',
+    'manlift - hydraulic - pwas not needed': 'Manlift - Hydraulic - PWAS Not Needed.png',
+    'manlift - scissor - pwas not needed': 'Manlift - Scissor - PWAS Not Needed.png',
+    'manlift - telescoping - pwas not needed': 'Manlift - Telescoping - PWAS Not Needed.png',
+    'mobile drilling rigs - pwas not needed': 'Mobile Drilling Rigs - PWAS Not Needed.png',
+    'off-highway trucks - pwas needed': 'Off-Highway Trucks - PWAS Needed.png',
+    'pavers - pwas not needed': 'Pavers - PWAS Not Needed.png',
+    'pay welder - pwas not needed': 'Pay Welder - PWAS Not Needed.png',
+    'scrapers - pwas needed': 'Scrapers - PWAS Needed.png',
+    'sideboom - pipelayer - pwas not needed': 'Sideboom - Pipelayer - PWAS Not Needed.png',
+    'straddle carrier - pwas not needed': 'Straddle Carrier - PWAS Not Needed.png',
+    'telehandlers - pwas needed': 'Telehandlers - PWAS Needed.png',
+    'traxcavator - pwas needed': 'Traxcavator - PWAS Needed.png',
+    'trenchers - pwas not needed': 'Trenchers - PWAS Not Needed.png',
+    'vacuum lifter - pwas needed': 'Vacuum Lifter - PWAS Needed.png',
+    'water / fuel tanker - pwas needed': 'Water Fuel Tanker - PWAS Needed.png',
+    'wheel loaders - pwas needed': 'Wheel Loaders - PWAS Needed.png',
+    'wheel pipeloader - pwas needed': 'Wheel Pipeloader - PWAS Needed.png'
+  };
+
+  function getEquipmentImage(type) {
+    if (!type) return null;
+    const key = type.trim().toLowerCase();
+    const filename = EQUIPMENT_IMAGE_MAP[key];
+    if (!filename) return null;
+    return `img/${filename}`;
+  }
+
+
+
   function findColumnIndex(headers, candidates) {
     if (!headers) return -1;
     const lower = headers.map(h => (h || '').toLowerCase().trim());
@@ -146,7 +199,9 @@ function parseCSV(text) {
     lastHeatSummary: null,
     lastWindSummary: null,
     permits: [],
-    permitsLoaded: false
+    permitsLoaded: false,
+    heavyEquipment: [],
+    heavyEquipmentLoaded: false
   };
 
   const obsFilterState = {
@@ -163,6 +218,12 @@ function parseCSV(text) {
     search: ''
   };
 
+  const heavyEquipmentFilterState = {
+    area: '',
+    status: '',
+    search: ''
+  };
+
   // Chart instances for Home tab donut charts
   let homeTopAreasChart = null;
   let homeTopDirectChart = null;
@@ -175,6 +236,7 @@ function parseCSV(text) {
   // track whether observations have been loaded at least once
   let observationsInitialized = false;
   let permitsInitialized = false;
+  let heavyEquipmentInitialized = false;
 
   function openTab(evt, tabId) {
     // hide all tab contents
@@ -226,6 +288,13 @@ function parseCSV(text) {
       permitsInitialized = true;
       loadPermits();
       setupPermitsFilters();
+    }
+
+    // 🚜 lazy-load Heavy Equipment when Heavy Equipment tab is opened
+    if (tabId === 'HeavyEquipmentTab' && !heavyEquipmentInitialized) {
+      heavyEquipmentInitialized = true;
+      loadHeavyEquipment();
+      setupHeavyEquipmentFilters();
     }
   }
 
@@ -3442,6 +3511,496 @@ function setupNewsPanel() {
 
 
   
+
+// -------------------- Heavy Equipment Register --------------------
+
+async function loadHeavyEquipment() {
+  const url = window.HEAVY_EQUIPMENT_SHEET_CSV_URL ||
+    'https://docs.google.com/spreadsheets/d/e/2PACX-1vT_OgUxJ8EheAsb_TxMcacQZf8DeUjKI_caEXZrWScZhOBzqRqjcUi8Tf5qduX4OEXXaVxbTOLRGIXF/pub?output=csv';
+
+  const list = $('#heavyEquipmentList');
+  const emptyState = $('#heavyEquipmentEmptyState');
+
+  if (!list) return;
+
+  if (emptyState) emptyState.style.display = 'none';
+  list.innerHTML =
+    '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading heavy equipment register...</div>';
+
+  if (!url) {
+    list.innerHTML =
+      '<p class="text-muted">No heavy equipment sheet configured. Set HEAVY_EQUIPMENT_SHEET_CSV_URL in js/data.js.</p>';
+    if (emptyState) emptyState.style.display = 'block';
+    return;
+  }
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    const rows = parseCSV(text);
+    if (!rows.length) throw new Error('Empty sheet');
+
+    const headers = rows[0];
+    const body = rows
+      .slice(1)
+      .filter(r => r.some(c => c && c.trim() !== ''));
+
+    const idxAsset = findColumnIndex(headers, [
+      'Module / Asset No.',
+      'Module / Asset No',
+      'Asset No',
+      'Asset #'
+    ]);
+    const idxType = findColumnIndex(headers, ['Equipment Type', 'Type']);
+    const idxOwner = findColumnIndex(headers, [
+      'Owner / Company',
+      'Owner',
+      'Company'
+    ]);
+    const idxArea = findColumnIndex(headers, [
+      'Area / Yard / Location',
+      'Area / Yard',
+      'Area / Location',
+      'Area',
+      'Location'
+    ]);
+    const idxInternal = findColumnIndex(headers, [
+      'Internal Inspection Expiry',
+      'Internal Expiry',
+      'Internal Inspection'
+    ]);
+    const idxThirdParty = findColumnIndex(headers, [
+      'Third Party Inspection Expiry',
+      'Third Party Expiry',
+      '3rd Party Inspection Expiry'
+    ]);
+    const idxStatus = findColumnIndex(headers, ['Status']);
+    const idxLastMaint = findColumnIndex(headers, [
+      'Last Maintenance Date',
+      'Last Maintenance'
+    ]);
+    const idxCertLink = findColumnIndex(headers, [
+      'Certificate Link',
+      'Certificate',
+      'Certificate URL'
+    ]);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const items = body.map((row, index) => {
+      const assetNo = idxAsset !== -1 ? (row[idxAsset] || '') : '';
+      const type = idxType !== -1 ? (row[idxType] || '') : '';
+      const owner = idxOwner !== -1 ? (row[idxOwner] || '') : '';
+      const area = idxArea !== -1 ? (row[idxArea] || '') : '';
+
+      const internalRaw = idxInternal !== -1 ? (row[idxInternal] || '') : '';
+      const internalDate = parseSheetDate(internalRaw);
+
+      const thirdPartyRaw =
+        idxThirdParty !== -1 ? (row[idxThirdParty] || '') : '';
+      const thirdPartyDate = parseSheetDate(thirdPartyRaw);
+
+      const status = idxStatus !== -1 ? (row[idxStatus] || '') : '';
+      const lastMaintRaw =
+        idxLastMaint !== -1 ? (row[idxLastMaint] || '') : '';
+      const lastMaintDate = parseSheetDate(lastMaintRaw);
+
+      const rawCert = idxCertLink !== -1 ? (row[idxCertLink] || '') : '';
+      const certLink =
+        rawCert && /^https?:\/\//i.test(rawCert) ? rawCert : '';
+
+      // Third party inspection status (TPI)
+      let tpiStatus = 'missing';
+      if (thirdPartyDate) {
+        if (thirdPartyDate < today) {
+          tpiStatus = 'expired';
+        } else {
+          const diffDays =
+            (thirdPartyDate - today) / (1000 * 60 * 60 * 24);
+          tpiStatus = diffDays <= 30 ? 'dueSoon' : 'valid';
+        }
+      }
+
+      // Internal inspection status (INI)
+      let iniStatus = 'missing';
+      if (internalDate) {
+        if (internalDate < today) {
+          iniStatus = 'expired';
+        } else {
+          const diffDaysIni =
+            (internalDate - today) / (1000 * 60 * 60 * 24);
+          iniStatus = diffDaysIni <= 30 ? 'dueSoon' : 'valid';
+        }
+      }
+
+      // Overall certificate status (used for summaries)
+      let certificateStatus = 'unknown';
+      if (thirdPartyDate) {
+        if (thirdPartyDate < today) {
+          certificateStatus = 'overdue';
+        } else {
+          const diffDays =
+            (thirdPartyDate - today) / (1000 * 60 * 60 * 24);
+          certificateStatus = diffDays <= 30 ? 'dueSoon' : 'valid';
+        }
+      } else {
+        certificateStatus = 'missing';
+      }
+
+      return {
+        _index: index,
+        assetNo,
+        type,
+        owner,
+        area,
+        internalRaw,
+        internalDate,
+        thirdPartyRaw,
+        thirdPartyDate,
+        status,
+        lastMaintRaw,
+        lastMaintDate,
+        certLink,
+        certificateStatus,
+        tpiStatus,
+        iniStatus
+      };
+    });
+
+    state.heavyEquipment = items;
+    state.heavyEquipmentLoaded = true;
+
+    updateHeavyEquipmentSummary(items);
+    populateHeavyEquipmentAreaFilter(items);
+    renderHeavyEquipmentList();
+  } catch (err) {
+    console.error('Error loading heavy equipment sheet:', err);
+    if (list) {
+      list.innerHTML =
+        '<p class="text-muted">Could not load heavy equipment register. Check the sheet link and try again.</p>';
+    }
+    if (emptyState) emptyState.style.display = 'block';
+  }
+}
+
+function updateHeavyEquipmentSummary(list) {
+  const items = Array.isArray(list) ? list : (state.heavyEquipment || []);
+  const total = items.length;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const valid = items.filter(
+    i => i.thirdPartyDate && i.thirdPartyDate >= today
+  ).length;
+
+  const overdueOrMissing = items.filter(
+    i => !i.thirdPartyDate || i.thirdPartyDate < today
+  ).length;
+
+  const totalEl = $('#heqCountTotal');
+  const validEl = $('#heqCountValid');
+  const overdueEl = $('#heqCountOverdue');
+
+  if (totalEl) totalEl.textContent = String(total || 0);
+  if (validEl) validEl.textContent = String(valid || 0);
+  if (overdueEl) overdueEl.textContent = String(overdueOrMissing || 0);
+}
+
+function populateHeavyEquipmentAreaFilter(list) {
+  const select = $('#heqAreaFilter');
+  if (!select || !Array.isArray(list)) return;
+
+  const current = select.value || '';
+
+  const areas = Array.from(
+    new Set(
+      list
+        .map(e => (e.area || '').trim())
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b));
+
+  let optionsHtml = '<option value="">All Yards / Areas</option>';
+  optionsHtml += areas
+    .map(a => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`)
+    .join('');
+
+  select.innerHTML = optionsHtml;
+
+  if (current && areas.includes(current)) {
+    select.value = current;
+  }
+}
+
+function renderHeavyEquipmentList() {
+  const list = $('#heavyEquipmentList');
+  const emptyState = $('#heavyEquipmentEmptyState');
+
+  if (!list) return;
+
+  const items = state.heavyEquipment || [];
+
+  if (!items.length) {
+    list.innerHTML = '';
+    if (emptyState) emptyState.style.display = 'block';
+    updateHeavyEquipmentSummary([]);
+    return;
+  }
+
+  let filtered = items.slice();
+
+  if (heavyEquipmentFilterState.area) {
+    const a = heavyEquipmentFilterState.area.toLowerCase();
+    filtered = filtered.filter(
+      e => (e.area || '').toLowerCase() === a
+    );
+  }
+
+  if (heavyEquipmentFilterState.status) {
+    const s = heavyEquipmentFilterState.status.toLowerCase();
+    filtered = filtered.filter(
+      e => (e.status || '').toLowerCase().includes(s)
+    );
+  }
+
+  if (heavyEquipmentFilterState.search) {
+    const q = heavyEquipmentFilterState.search.toLowerCase();
+    filtered = filtered.filter(e => {
+      const hay = [
+        e.assetNo,
+        e.type,
+        e.owner,
+        e.area
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }
+
+  if (!filtered.length) {
+    list.innerHTML =
+      '<p class="text-muted">No equipment matches the current filters.</p>';
+    if (emptyState) emptyState.style.display = 'block';
+    updateHeavyEquipmentSummary([]);
+    return;
+  }
+
+  if (emptyState) emptyState.style.display = 'none';
+
+  filtered.sort((a, b) => {
+    const areaA = (a.area || '').toLowerCase();
+    const areaB = (b.area || '').toLowerCase();
+    if (areaA < areaB) return -1;
+    if (areaA > areaB) return 1;
+    const assetA = (a.assetNo || '').toLowerCase();
+    const assetB = (b.assetNo || '').toLowerCase();
+    if (assetA < assetB) return -1;
+    if (assetA > assetB) return 1;
+    return 0;
+  });
+
+  list.innerHTML = filtered
+    .map(item => {
+      const internal = item.internalRaw || '—';
+      const thirdParty = item.thirdPartyRaw || '—';
+      const lastMaint = item.lastMaintRaw || '—';
+
+      const imgSrc = getEquipmentImage(item.type);
+      const imgHtml = imgSrc
+        ? `<img src="${imgSrc}" alt="${escapeHtml(item.type || 'Equipment')}"
+               class="heavy-equipment-thumb" loading="lazy">`
+        : '';
+
+      // Badge labels and classes for TPI
+      let tpiLabel = 'TPI – No record';
+      let tpiClass = 'heq-badge heq-badge-missing';
+      if (item.tpiStatus === 'valid') {
+        tpiLabel = 'Valid TPI';
+        tpiClass = 'heq-badge heq-badge-valid';
+      } else if (item.tpiStatus === 'dueSoon') {
+        tpiLabel = 'TPI – Due soon';
+        tpiClass = 'heq-badge heq-badge-due';
+      } else if (item.tpiStatus === 'expired') {
+        tpiLabel = 'TPI – Expired';
+        tpiClass = 'heq-badge heq-badge-expired';
+      }
+
+      // Badge labels and classes for INI
+      let iniLabel = 'INI – No record';
+      let iniClass = 'heq-badge heq-badge-missing';
+      if (item.iniStatus === 'valid') {
+        iniLabel = 'Valid INI';
+        iniClass = 'heq-badge heq-badge-valid';
+      } else if (item.iniStatus === 'dueSoon') {
+        iniLabel = 'INI – Due soon';
+        iniClass = 'heq-badge heq-badge-due';
+      } else if (item.iniStatus === 'expired') {
+        iniLabel = 'INI – Expired';
+        iniClass = 'heq-badge heq-badge-expired';
+      }
+
+      return `
+        <article class="obs-card heavy-equipment-card" data-heavy-index="${item._index}">
+          <header class="obs-card-header">
+            <div class="obs-card-title-row">
+              ${imgHtml}
+              <h3 class="obs-type">${escapeHtml(item.assetNo || 'Unknown asset')}</h3>
+            </div>
+            <div class="obs-chip-row">
+              <span class="${tpiClass}">${escapeHtml(tpiLabel)}</span>
+              <span class="${iniClass}">${escapeHtml(iniLabel)}</span>
+              ${item.area ? `<span class="obs-chip">${escapeHtml(item.area)}</span>` : ''}
+            </div>
+          </header>
+          <div class="obs-card-body">
+            <p class="obs-description">
+              ${item.type ? `Type: ${escapeHtml(item.type)}<br>` : ''}
+              ${item.owner ? `Owner: ${escapeHtml(item.owner)}<br>` : ''}
+              Last maintenance: ${escapeHtml(lastMaint)}
+            </p>
+          </div>
+          <footer class="obs-card-footer">
+            ${
+              item.certLink
+                ? `<a href="${escapeHtml(item.certLink)}" target="_blank" rel="noopener">Open certificate</a>`
+                : '<span class="text-muted">No certificate link</span>'
+            }
+          </footer>
+        </article>
+      `;
+    })
+    .join('');
+
+  list.querySelectorAll('.heavy-equipment-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const idxStr = card.getAttribute('data-heavy-index');
+      const idx = parseInt(idxStr, 10);
+      const item = state.heavyEquipment[idx];
+      if (item) showHeavyEquipmentDetail(item);
+    });
+  });
+
+  updateHeavyEquipmentSummary(filtered);
+}
+
+function setupHeavyEquipmentFilters() {
+  const areaSelect = $('#heqAreaFilter');
+  const statusSelect = $('#heqStatusFilter');
+  const searchInput = $('#heqSearch');
+  const openSheetBtn = $('#heavyOpenSheetButton');
+
+  if (areaSelect) {
+    areaSelect.addEventListener('change', () => {
+      heavyEquipmentFilterState.area = areaSelect.value || '';
+      renderHeavyEquipmentList();
+    });
+  }
+
+  if (statusSelect) {
+    statusSelect.addEventListener('change', () => {
+      heavyEquipmentFilterState.status = statusSelect.value || '';
+      renderHeavyEquipmentList();
+    });
+  }
+
+  if (searchInput) {
+    searchInput.addEventListener('input', () => {
+      heavyEquipmentFilterState.search = searchInput.value || '';
+      renderHeavyEquipmentList();
+    });
+  }
+
+  if (openSheetBtn) {
+    openSheetBtn.addEventListener('click', () => {
+      const url =
+        window.HEAVY_EQUIPMENT_FULL_SHEET_URL ||
+        window.HEAVY_EQUIPMENT_SHEET_CSV_URL ||
+        'https://docs.google.com/spreadsheets/d/e/2PACX-1vT_OgUxJ8EheAsb_TxMcacQZf8DeUjKI_caEXZrWScZhOBzqRqjcUi8Tf5qduX4OEXXaVxbTOLRGIXF/pub?output=csv';
+      if (url) window.open(url, '_blank');
+    });
+  }
+}
+
+function showHeavyEquipmentDetail(item) {
+  const modal = $('#heavyEquipmentDetailModal');
+  const body = $('#heavyEquipmentDetailBody');
+  if (!modal || !body) return;
+
+  const internal = item.internalRaw || '—';
+  const thirdParty = item.thirdPartyRaw || '—';
+  const lastMaint = item.lastMaintRaw || '—';
+
+  const certStatusLabel =
+    item.certificateStatus === 'valid'
+      ? 'Valid certificate'
+      : item.certificateStatus === 'dueSoon'
+      ? 'Expiring soon'
+      : item.certificateStatus === 'overdue'
+      ? 'Overdue / expired'
+      : item.certificateStatus === 'missing'
+      ? 'No certificate'
+      : 'Certificate status';
+
+  const certLinkHtml = item.certLink
+    ? `<a href="${escapeHtml(item.certLink)}" target="_blank" rel="noopener">Open certificate</a>`
+    : '<span class="text-muted">No certificate link</span>';
+
+  const imgSrc = getEquipmentImage(item.type);
+  const imageBlock = imgSrc
+    ? `
+      <div class="heavy-equipment-detail-image">
+        <img src="${imgSrc}" alt="${escapeHtml(item.type || 'Equipment')}" loading="lazy">
+      </div>
+    `
+    : '';
+
+  body.innerHTML = `
+    <section class="obs-detail-section">
+      ${imageBlock}
+      <div class="obs-detail-section-title">Equipment</div>
+      <div class="obs-detail-grid">
+        <div><strong>Module / Asset No.</strong><br>${escapeHtml(item.assetNo || 'Unknown asset')}</div>
+        <div><strong>Equipment Type</strong><br>${escapeHtml(item.type || '')}</div>
+        <div><strong>Owner / Company</strong><br>${escapeHtml(item.owner || '')}</div>
+        <div><strong>Area / Yard / Location</strong><br>${escapeHtml(item.area || '')}</div>
+      </div>
+    </section>
+
+    <section class="obs-detail-section">
+      <div class="obs-detail-section-title">Inspections &amp; Maintenance</div>
+      <div class="obs-detail-grid">
+        <div><strong>Internal inspection expiry</strong><br>${escapeHtml(internal)}</div>
+        <div><strong>Third party inspection expiry</strong><br>${escapeHtml(thirdParty)}</div>
+        <div><strong>Last maintenance date</strong><br>${escapeHtml(lastMaint)}</div>
+        <div><strong>Status</strong><br>${escapeHtml(item.status || '')}</div>
+      </div>
+    </section>
+
+    <section class="obs-detail-section">
+      <div class="obs-detail-section-title">Certificates</div>
+      <p class="obs-detail-description-box">
+        ${certStatusLabel}<br>
+        ${certLinkHtml}
+      </p>
+    </section>
+  `;
+
+  modal.classList.add('show');
+}
+
+function hideHeavyEquipmentDetailModal() {
+  const modal = $('#heavyEquipmentDetailModal');
+  if (modal) modal.classList.remove('show');
+}
+
+window.hideHeavyEquipmentDetailModal = hideHeavyEquipmentDetailModal;
+
+
 // -------------------- Toolbox Talks --------------------
 
 const toolboxFilterState = {
@@ -3872,6 +4431,14 @@ window.EOM_SHEET_URL =
 // Observations main data sheet (CSV)
 window.OBSERVATIONS_SHEET_CSV_URL =
   'https://docs.google.com/spreadsheets/d/e/2PACX-1vTXlN-sE-IkQJLMaVOvRGSBYNLsDvwZTD15w7rarTIXBGoacF0C5_eiI7OmFs__zA8jtlwhy0ULLZ8N/pub?output=csv';
+
+// Heavy Equipment register sheet (CSV)
+window.HEAVY_EQUIPMENT_SHEET_CSV_URL =
+  'https://docs.google.com/spreadsheets/d/e/2PACX-1vT_OgUxJ8EheAsb_TxMcacQZf8DeUjKI_caEXZrWScZhOBzqRqjcUi8Tf5qduX4OEXXaVxbTOLRGIXF/pub?output=csv';
+
+// Optional full Heavy Equipment sheet URL (uses CSV link by default if not overridden)
+window.HEAVY_EQUIPMENT_FULL_SHEET_URL =
+  window.HEAVY_EQUIPMENT_FULL_SHEET_URL || window.HEAVY_EQUIPMENT_SHEET_CSV_URL;
 
 // News / Announcements sheet (CSV)
 window.NEWS_SHEET_CSV_URL =
