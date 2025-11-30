@@ -436,6 +436,108 @@
 <p>No permits data loaded yet.</p>
 </div>
 </section>
+
+<!-- HEAVY EQUIPMENT TAB -->
+<section class="tab-content" id="HeavyEquipmentTab">
+<div class="obs-summary-bar">
+  <div class="obs-summary-item">
+    <div class="obs-summary-label">Total Equipment</div>
+    <div class="obs-summary-value" id="heqCountTotal">--</div>
+  </div>
+  <div class="obs-summary-item">
+    <div class="obs-summary-label">Valid Certificates</div>
+    <div class="obs-summary-value" id="heqCountValid">--</div>
+  </div>
+  <div class="obs-summary-item">
+    <div class="obs-summary-label">Overdue / Missing</div>
+    <div class="obs-summary-value" id="heqCountOverdue">--</div>
+  </div>
+</div>
+
+<div class="obs-filters">
+  <div class="obs-filter-row">
+    <select id="heqAreaFilter">
+      <option value="">All Yards / Areas</option>
+    </select>
+    <select id="heqStatusFilter">
+      <option value="">All Statuses</option>
+      <option value="In Service">In Service</option>
+      <option value="Out of Service">Out of Service</option>
+    </select>
+  </div>
+
+  <div class="obs-filter-row">
+    <input
+      id="heqSearch"
+      type="text"
+      placeholder="Search by asset no., type, owner, area..."
+    />
+  </div>
+
+  <div class="obs-filter-row" style="justify-content: center;">
+    <a
+      class="obs-open-sheet-btn"
+      href="https://forms.gle/DuWuy4dyUfTkiL5t7"
+      id="addHeavyEquipmentButton"
+      target="_blank"
+      rel="noopener"
+    >
+      <i class="fas fa-plus-circle"></i>
+      Add Heavy Equipment
+    </a>
+  </div>
+</div>
+
+<div id="heavyEquipmentList"></div>
+
+<button class="obs-open-sheet-btn" id="heavyOpenSheetButton" type="button">
+  <i class="fas fa-table"></i>
+  Open full heavy equipment sheet
+</button>
+
+<section
+  class="obs-card obs-tips-card heavy-equipment-tips-card"
+  aria-label="Heavy Equipment safety tips"
+>
+  <header class="obs-tips-header">
+    <h3><i class="fas fa-truck-front"></i> Heavy Equipment Safety Tips</h3>
+    <p>
+      Use this register to check certificates and plan inspections for cranes,
+      forklifts, MEWPs and other plant.
+    </p>
+  </header>
+  <ul class="obs-tips-list">
+    <li>
+      <span class="tip-title">Verify certification</span> – make sure
+      third-party inspections are in date before the equipment enters the yard.
+    </li>
+    <li>
+      <span class="tip-title">Check visible defects</span> – leaks, damaged
+      tyres, cracked hooks, or broken mirrors should be reported before use.
+    </li>
+    <li>
+      <span class="tip-title">Match equipment to task</span> – verify load
+      charts, reach, and ground conditions are suitable for the planned lift or
+      movement.
+    </li>
+    <li>
+      <span class="tip-title">Control access</span> – only trained and
+      authorised operators should receive keys or access cards.
+    </li>
+    <li>
+      <span class="tip-title">Plan maintenance</span> – use the “Last
+      Maintenance Date” to trigger preventive maintenance and avoid unplanned
+      breakdowns.
+    </li>
+  </ul>
+</section>
+
+<div class="obs-empty-state" id="heavyEquipmentEmptyState" style="display: none;">
+  <i class="fas fa-database"></i>
+  <p>No heavy equipment data loaded yet.</p>
+</div>
+</section>
+
 <!-- TOOLBOX TALK TAB -->
 <section class="tab-content" id="ToolboxTab">
 <div class="obs-summary-bar">
@@ -838,6 +940,18 @@
 <div id="permitDetailBody"></div>
 </div>
 </div>
+
+<!-- 🚜 Heavy Equipment detail modal -->
+<div class="modal" id="heavyEquipmentDetailModal">
+<div class="modal-content">
+<button class="close-btn" onclick="hideHeavyEquipmentDetailModal()" type="button">
+                    ×
+                </button>
+<h2>Heavy Equipment Details</h2>
+<div id="heavyEquipmentDetailBody"></div>
+</div>
+</div>
+
 <!-- 🧰 Toolbox Talk detail modal -->
 <div class="modal" id="toolboxDetailModal">
 <div class="modal-content">
@@ -869,6 +983,10 @@
 <button class="nav-button" data-tab="PermitsTab" type="button">
 <span class="nav-icon"><i class="fas fa-id-card-clip"></i></span>
 <span>Permits</span>
+</button>
+<button class="nav-button" data-tab="HeavyEquipmentTab" type="button">
+<span class="nav-icon"><i class="fas fa-truck-front"></i></span>
+<span>Heavy Equip.</span>
 </button>
 <button class="nav-button" data-tab="ToolboxTab" type="button">
 <span class="nav-icon"><i class="fas fa-chalkboard-teacher"></i></span>
