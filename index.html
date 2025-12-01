@@ -730,6 +730,9 @@
 <button class="tool-toggle-btn" data-tool="heat" type="button">
                     Calculators
                 </button>
+<button class="tool-toggle-btn" data-tool="training" type="button">
+                    Training Matrix
+                </button>
 </div>
 <!-- RISK MATRIX CARD -->
 <section class="home-card tools-card" id="riskMatrixSection" style="display: none;">
@@ -834,6 +837,41 @@
 </ul>
 </div>
 </section>
+<!-- TRAINING MATRIX CARD -->
+<section class="home-card tools-card" id="trainingMatrixSection" style="display: none;">
+  <div class="tools-section-header training">
+    <i class="fas fa-user-graduate"></i>
+    <div>
+      <h3>Training Matrix</h3>
+      <small>Select a job role to see required HSE trainings &amp; validity (years).</small>
+    </div>
+  </div>
+
+  <div class="kpi-card training-matrix-card">
+    <div class="kpi-input-group">
+      <label for="trainingRoleSelect">Job Role</label>
+      <select class="kpi-input-field" id="trainingRoleSelect">
+        <option value="">Select job role…</option>
+      </select>
+    </div>
+    <div class="kpi-input-group">
+      <label for="trainingSearchInput">Filter trainings</label>
+      <input
+        class="kpi-input-field"
+        id="trainingSearchInput"
+        type="text"
+        placeholder="Search training module…"
+      />
+    </div>
+  </div>
+
+  <div class="training-matrix-results" id="trainingMatrixResults">
+    <p class="text-muted">
+      Select a job role above to view mandatory trainings.
+    </p>
+  </div>
+</section>
+
 <!-- LIFESAVING RULES CHECKLIST -->
 <section class="home-card tools-card" id="lifesavingRulesCard">
 <div class="tools-section-header">
