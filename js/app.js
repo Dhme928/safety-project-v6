@@ -1877,30 +1877,212 @@ function calculateWindSafety() {
 
   window.calculateWindSafety = calculateWindSafety;
 
-  function setupTools() {
+  
+// -------------------- Training Matrix tool --------------------
+
+const TRAINING_MODULES = [
+  { id: 'site-orientation', title: 'SITE SPECIFIC SAFETY ORIENTATION / COC', years: 2 },
+  { id: 'environmental-orientation', title: 'ENVIRONMENTAL ORIENTATION', years: 2 },
+  { id: 'defensive-driving', title: 'DEFENSIVE & OFF-ROAD DRIVING / JMP', years: 2 },
+  { id: 'emergency-response', title: 'EMERGENCY RESPONSE PROCEDURE', years: 2 },
+  { id: 'fire-prevention', title: 'FIRE PREVENTION & PROTECTION', years: 2 },
+  { id: 'hand-power-tools', title: 'HAND & POWER TOOLS / ELECTRICAL SAFETY', years: 2 },
+  { id: 'ppe', title: 'PERSONAL PROTECTIVE EQUIPMENT (PPE)', years: 2 },
+  { id: 'heat-stress', title: 'HEAT STRESS AWARENESS', years: 2 },
+  { id: 'haz-chem', title: 'HAZARDOUS CHEMICALS / RPE', years: 1 },
+  { id: 'heavy-equipment', title: 'HEAVY EQUIPMENT SAFETY', years: 1 },
+  { id: 'work-permit', title: 'WORK PERMIT SYSTEM', years: 2 },
+  { id: 'authorized-gas-tester', title: 'AUTHORIZED GAS TESTER', years: 2 },
+  { id: 'confined-space', title: 'CONFINED SPACE ENTRY / RESCUE', years: 2 },
+  { id: 'hazard-recognition', title: 'HAZARD RECOGNITION', years: 2 },
+  { id: 'safe-rigging-lifting', title: 'SAFE RIGGING & LIFTING', years: 2 },
+  { id: 'loto-isolation', title: 'LOTO - ISOLATION', years: 2 },
+  { id: 'excavation-safety', title: 'EXCAVATION SAFETY', years: 2 },
+  { id: 'work-at-height', title: 'WORK AT HEIGHT & LADDERS SAFETY', years: 2 },
+  { id: 'hip-cssp', title: 'HIP / CSSP', years: 2 },
+  { id: 'h2s', title: 'HYDROGEN SULFIDE (H2S)', years: 2 },
+  { id: 'incident-reporting', title: 'INCIDENT REPORTING & INVESTIGATION', years: 2 },
+  { id: 'housekeeping', title: 'HOUSEKEEPING', years: 2 },
+  { id: 'jsa', title: 'JOB SAFETY ANALYSIS & PRE JOB BRIEFING', years: 2 },
+  { id: 'manual-handling', title: 'MATERIALS / MANUAL HANDLING', years: 2 },
+  { id: 'line-of-fire', title: 'LINE OF FIRE', years: 2 },
+  { id: 'sa-safety-handbook', title: 'SA SAFETY HAND BOOK / CSM 24 HRS / CSAR', years: 2 },
+  { id: 'compressed-gas', title: 'COMPRESSED GAS CYLINDERS', years: 2 },
+  { id: 'first-aid-bls', title: 'FIRST AID (FA) & BASIC LIFE SUPPORT (BLS)', years: 2 },
+  { id: 'hmi', title: 'HUMAN MACHINE INTERFACE', years: 2 },
+  { id: 'hydrotest-safety', title: 'HYDROTEST SAFETY', years: 2 },
+  { id: 'abrasive-blasting', title: 'ABRASIVE BLASTING SAFETY', years: 2 },
+  { id: 'pwas-awareness', title: 'PWAS AWARENESS', years: 2 },
+  { id: 'flagman-resp', title: 'FLAG MAN RESPONSIBILITIES', years: 2 },
+  { id: 'fire-watch-resp', title: 'FIRE WATCH RESPONSIBILITIES', years: 2 },
+  { id: 'standby-man-resp', title: 'STANDBY MAN RESPONSIBILITIES', years: 2 },
+  { id: 'stop-work', title: 'STOP WORK AUTHORITY', years: 2 },
+];
+
+// Job roles taken from the project HSE training matrix
+const TRAINING_ROLES = [
+  { id: 'project-manager', label: 'Project Manager' },
+  { id: 'construction-manager', label: 'Construction Manager' },
+  { id: 'project-engineers', label: 'Project Engineers' },
+  { id: 'site-engineers', label: 'Site Engineers' },
+  { id: 'surveyors', label: 'Surveyors' },
+  { id: 'supervisors', label: 'Supervisors' },
+  { id: 'foremen', label: 'Foremen' },
+  { id: 'chargehands', label: 'Chargehands' },
+  { id: 'welders', label: 'Welders' },
+  { id: 'masons', label: 'Masons' },
+  { id: 'electricians', label: 'Electricians' },
+  { id: 'equipment-operators', label: 'Equipment Operators' },
+  { id: 'crane-operators', label: 'Crane Operators' },
+  { id: 'riggers', label: 'Riggers' },
+  { id: 'heavy-duty-drivers', label: 'Heavy Duty Drivers' },
+  { id: 'light-duty-drivers', label: 'Light Duty Drivers' },
+  { id: 'store-personnel', label: 'Store Personnel' },
+  { id: 'pipe-fitters', label: 'Pipe Fitters' },
+  { id: 'sand-blasters', label: 'Sand Blasters' },
+  { id: 'hsse-wp-coordinator', label: 'HSSE & WP Coordinator' },
+  { id: 'safety-officers', label: 'Safety Officers' },
+  { id: 'work-permit-receiver', label: 'Work Permit Receiver' },
+  { id: 'office-workers', label: 'Office Workers' },
+  { id: 'kitchen-staff', label: 'Kitchen Staff' },
+  { id: 'camp-staff', label: 'Camp Staff' },
+  { id: 'qaqc-personnel', label: 'QA/QC Personnel' },
+  { id: 'labor', label: 'Labor' },
+];
+
+const ALL_TRAINING_IDS = TRAINING_MODULES.map(m => m.id);
+
+const TRAINING_MATRIX = {
+  'project-manager': ALL_TRAINING_IDS,
+  'construction-manager': ALL_TRAINING_IDS,
+  'project-engineers': ALL_TRAINING_IDS,
+  'site-engineers': ALL_TRAINING_IDS,
+  'surveyors': ALL_TRAINING_IDS,
+  'supervisors': ALL_TRAINING_IDS,
+  'foremen': ALL_TRAINING_IDS,
+  'chargehands': ALL_TRAINING_IDS,
+  'welders': ALL_TRAINING_IDS,
+  'masons': ALL_TRAINING_IDS,
+  'electricians': ALL_TRAINING_IDS,
+  'equipment-operators': ALL_TRAINING_IDS,
+  'crane-operators': ALL_TRAINING_IDS,
+  'riggers': ALL_TRAINING_IDS,
+  'heavy-duty-drivers': ALL_TRAINING_IDS,
+  'light-duty-drivers': ALL_TRAINING_IDS,
+  'store-personnel': ALL_TRAINING_IDS,
+  'pipe-fitters': ALL_TRAINING_IDS,
+  'sand-blasters': ALL_TRAINING_IDS,
+  'hsse-wp-coordinator': ALL_TRAINING_IDS,
+  'safety-officers': ALL_TRAINING_IDS,
+  'work-permit-receiver': ALL_TRAINING_IDS,
+  'office-workers': ALL_TRAINING_IDS,
+  'kitchen-staff': ALL_TRAINING_IDS,
+  'camp-staff': ALL_TRAINING_IDS,
+  'qaqc-personnel': ALL_TRAINING_IDS,
+  'labor': ALL_TRAINING_IDS,
+};
+
+const TRAINING_MODULES_BY_ID = TRAINING_MODULES.reduce((acc, mod) => {
+  acc[mod.id] = mod;
+  return acc;
+}, {});
+
+function setupTrainingMatrixTool() {
+  const roleSelect = $('#trainingRoleSelect');
+  const searchInput = $('#trainingSearchInput');
+  const resultsEl = $('#trainingMatrixResults');
+  if (!roleSelect || !resultsEl) return;
+
+  // Populate roles dropdown
+  roleSelect.innerHTML =
+    '<option value="">Select job role…</option>' +
+    TRAINING_ROLES.map(role =>
+      '<option value="' + role.id + '">' + escapeHtml(role.label) + '</option>'
+    ).join('');
+
+  function render() {
+    const roleId = roleSelect.value;
+    const search = (searchInput && searchInput.value || '').toLowerCase().trim();
+
+    if (!roleId) {
+      resultsEl.innerHTML =
+        '<p class="text-muted">Select a job role above to view mandatory trainings.</p>';
+      return;
+    }
+
+    const moduleIds = TRAINING_MATRIX[roleId] || [];
+    if (!moduleIds.length) {
+      resultsEl.innerHTML =
+        '<p class="text-muted">No trainings configured yet for this role.</p>';
+      return;
+    }
+
+    const modules = moduleIds
+      .map(id => TRAINING_MODULES_BY_ID[id])
+      .filter(Boolean)
+      .filter(mod => !search || mod.title.toLowerCase().includes(search));
+
+    if (!modules.length) {
+      resultsEl.innerHTML =
+        '<p class="text-muted">No trainings match this search for the selected role.</p>';
+      return;
+    }
+
+    const itemsHtml = modules.map(mod => {
+      const years = mod.years || 2;
+      const yearsLabel = years === 1 ? 'Valid 1 year' : 'Valid ' + years + ' years';
+      return (
+        '<div class="training-row">' +
+          '<div class="training-title">' + escapeHtml(mod.title) + '</div>' +
+          '<div class="training-meta">' +
+            '<span class="training-chip training-chip-required">Required</span>' +
+            '<span class="training-chip training-chip-years">' + yearsLabel + '</span>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
+
+    resultsEl.innerHTML = itemsHtml;
+  }
+
+  roleSelect.addEventListener('change', render);
+  if (searchInput) searchInput.addEventListener('input', render);
+
+  // Initial state
+  render();
+}
+
+
+function setupTools() {
     const riskBtn = document.querySelector('[data-tool="risk"]');
     const heatBtn = document.querySelector('[data-tool="heat"]'); // Calculators
+    const trainingBtn = document.querySelector('[data-tool="training"]');
 
     const riskSection = $('#riskMatrixSection');
     const heatSection = $('#heatStressSection');
     const windSection = $('#windSpeedSection');
+    const trainingSection = $('#trainingMatrixSection');
 
     function setActive(tool) {
-      [riskBtn, heatBtn].forEach(btn => btn && btn.classList.remove('active-tool'));
+      [riskBtn, heatBtn, trainingBtn].forEach(btn => btn && btn.classList.remove('active-tool'));
 
       if (tool === 'risk' && riskBtn) riskBtn.classList.add('active-tool');
       if (tool === 'heat' && heatBtn) heatBtn.classList.add('active-tool');
+      if (tool === 'training' && trainingBtn) trainingBtn.classList.add('active-tool');
 
       const showRisk = tool === 'risk';
       const showCalculators = tool === 'heat';
+      const showTraining = tool === 'training';
 
       if (riskSection) riskSection.style.display = showRisk ? 'block' : 'none';
       if (heatSection) heatSection.style.display = showCalculators ? 'block' : 'none';
       if (windSection) windSection.style.display = showCalculators ? 'block' : 'none';
+      if (trainingSection) trainingSection.style.display = showTraining ? 'block' : 'none';
     }
 
     if (riskBtn) riskBtn.addEventListener('click', () => setActive('risk'));
     if (heatBtn) heatBtn.addEventListener('click', () => setActive('heat'));
+    if (trainingBtn) trainingBtn.addEventListener('click', () => setActive('training'));
 
     // expose for any old inline onclick
     window.switchTool = setActive;
@@ -4388,6 +4570,7 @@ function initApp() {
   setupWalkthroughLibrary();
   setupLibrarySwitcher();
   setupTools();
+  setupTrainingMatrixTool();
   setupRiskMatrix();
   setupNewsPanel();
   loadEomAndLeaderboard();
