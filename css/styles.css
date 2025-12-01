@@ -2807,3 +2807,78 @@ body.dark-mode .news-back-btn {
   background: #0f172a;
   color: #9ca3af;
 }
+
+
+/* Training Matrix tool */
+.tools-section-header.training {
+  border-left: 4px solid #2563eb;
+}
+
+.training-matrix-card {
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.training-matrix-card .kpi-input-group {
+  margin-bottom: 0.75rem;
+}
+
+.training-matrix-results {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.training-row {
+  display: flex;
+  flex-direction: column;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, #0f172a, #1f2937);
+  color: #f9fafb;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.35);
+}
+
+.training-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.training-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  font-size: 0.7rem;
+}
+
+.training-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.training-chip-required {
+  background: #22c55e;
+  color: #052e16;
+}
+
+.training-chip-years {
+  background: #0ea5e9;
+  color: #022c22;
+}
+
+@media (min-width: 640px) {
+  .training-row {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .training-title {
+    font-size: 0.9rem;
+  }
+}
